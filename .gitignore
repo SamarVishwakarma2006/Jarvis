@@ -1,0 +1,10 @@
+# Windows and editor files
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
