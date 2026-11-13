@@ -1,6 +1,6 @@
 # VoiceDesk
 
-A small Windows desktop voice-control prototype. VoiceDesk listens for a fixed set of spoken commands and maps them to familiar desktop actions. It uses Windows' installed speech recognition engine and does not send audio to an AI service.
+A small Windows desktop voice-control prototype. VoiceDesk listens for a fixed set of spoken commands and maps them to familiar desktop actions. Its window shows microphone status, recognized speech, the last action, and start/stop controls. It uses Windows' installed speech recognition engine and does not send audio to an AI service.
 
 See [ROADMAP.md](ROADMAP.md) for the GitHub-tracked steps toward a more capable assistant.
 
@@ -8,6 +8,7 @@ See [ROADMAP.md](ROADMAP.md) for the GitHub-tracked steps toward a more capable 
 
 - Windows 10 or 11
 - Windows PowerShell 5.1
+- .NET Framework components included with Windows PowerShell (System.Speech and Windows Forms)
 - A microphone and an installed Windows speech recognizer for your current language
 
 ## Run
@@ -35,7 +36,7 @@ Say one of these commands:
 - “Take screenshot” (sends Print Screen)
 - “Stop listening”
 
-Use `Ctrl+C` or say “Stop listening” to exit. VoiceDesk reports rejected speech and action errors, and ignores recognized phrases below its confidence threshold. “Close window” sends `Alt+F4` to the foreground window, so save your work first. “Take screenshot” sends Print Screen but does not save an image. VoiceDesk intentionally has no shutdown, arbitrary shell, or arbitrary file-opening command in this prototype.
+Press **Start listening** before speaking. Press **Stop listening**, say “Stop listening”, or close the app to stop microphone capture. VoiceDesk shows the recognized phrase and last action, reports microphone/recognition errors, and ignores recognized phrases below its confidence threshold. “Close window” sends `Alt+F4` to the foreground window, so save your work first. “Take screenshot” sends Print Screen but does not save an image. VoiceDesk intentionally has no shutdown, arbitrary shell, or arbitrary file-opening command in this prototype.
 
 ## Scope
 
