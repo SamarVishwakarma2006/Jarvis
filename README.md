@@ -2,6 +2,8 @@
 
 A small Windows desktop voice-control prototype. VoiceDesk listens for a fixed set of spoken commands and maps them to familiar desktop actions. It uses Windows' installed speech recognition engine and does not send audio to an AI service.
 
+See [ROADMAP.md](ROADMAP.md) for the GitHub-tracked steps toward a more capable assistant.
+
 ## Requirements
 
 - Windows 10 or 11
