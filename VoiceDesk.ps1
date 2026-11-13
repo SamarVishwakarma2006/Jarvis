@@ -2,6 +2,75 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Speech
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class VoiceDeskNative {
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr handle, StringBuilder text, int count);
+}
+'@
+
+function Get-ActiveTarget {
+    $handle = [VoiceDeskNative]::GetForegroundWindow()
+    if ($handle -eq [IntPtr]::Zero) { throw 'No foreground window was found.' }
+    if ($handle -eq $form.Handle) { throw 'VoiceDesk is the active window. Select the window you want to control, then try again.' }
+
+    $element = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
+    $title = $element.Current.Name
+    if ([string]::IsNullOrWhiteSpace($title)) {
+        $text = [System.Text.StringBuilder]::new(512)
+        [void][VoiceDeskNative]::GetWindowText($handle, $text, $text.Capacity)
+        $title = $text.ToString()
+    }
+    if ([string]::IsNullOrWhiteSpace($title)) { $title = 'Untitled window' }
+    return @{ Handle = $handle; Element = $element; Title = $title }
+}
+
+function Invoke-DesktopAction {
+    param([Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name)
+
+    switch ($Name) {
+        'OpenNotepad' { Start-Process notepad; return 'Opened Notepad.' }
+        'OpenCalculator' { Start-Process calc; return 'Opened Calculator.' }
+    }
+
+    $target = Get-ActiveTarget
+    if ($Name -eq 'TakeScreenshot') {
+        [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}')
+        return "Sent Print Screen for '$($target.Title)'; no image file was saved."
+    }
+
+    try {
+        if ([VoiceDeskNative]::GetForegroundWindow() -ne $target.Handle) {
+            throw 'The active window changed before the action could run.'
+        }
+        $pattern = $null
+        $hasWindowPattern = $target.Element.TryGetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern, [ref]$pattern)
+        if (-not $hasWindowPattern) { throw 'The window does not expose the UI Automation window pattern.' }
+        switch ($Name) {
+            'MinimizeWindow' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Minimized) }
+            'MaximizeWindow' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Maximized) }
+            'CloseWindow' { $pattern.Close() }
+        }
+        return "$Name completed for '$($target.Title)' using UI Automation."
+    } catch {
+        # The active window is checked again before the keyboard fallback.
+        if ([VoiceDeskNative]::GetForegroundWindow() -ne $target.Handle) {
+            throw "The active window changed before the fallback action could run. $($_.Exception.Message)"
+        }
+        switch ($Name) {
+            'MinimizeWindow' { [System.Windows.Forms.SendKeys]::SendWait('% n') }
+            'MaximizeWindow' { [System.Windows.Forms.SendKeys]::SendWait('% x') }
+            'CloseWindow' { [System.Windows.Forms.SendKeys]::SendWait('%{F4}') }
+        }
+        return "$Name shortcut sent to '$($target.Title)' (UI Automation was unavailable)."
+    }
+}
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $culture = (Get-Culture).Name
@@ -101,12 +170,12 @@ if (-not $recognizerInfo) {
             } else {
                 try {
                     switch ($command) {
-                        'open notepad' { Start-Process notepad; $result = 'Opened Notepad.' }
-                        'open calculator' { Start-Process calc; $result = 'Opened Calculator.' }
-                        'minimize window' { [System.Windows.Forms.SendKeys]::SendWait('% n'); $result = 'Sent minimize shortcut to the active window.' }
-                        'maximize window' { [System.Windows.Forms.SendKeys]::SendWait('% x'); $result = 'Sent maximize shortcut to the active window.' }
-                        'close window' { [System.Windows.Forms.SendKeys]::SendWait('%{F4}'); $result = 'Sent close shortcut to the active window.' }
-                        'take screenshot' { [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}'); $result = 'Sent Print Screen; no image file was saved.' }
+                        'open notepad' { $result = Invoke-DesktopAction -Name OpenNotepad }
+                        'open calculator' { $result = Invoke-DesktopAction -Name OpenCalculator }
+                        'minimize window' { $result = Invoke-DesktopAction -Name MinimizeWindow }
+                        'maximize window' { $result = Invoke-DesktopAction -Name MaximizeWindow }
+                        'close window' { $result = Invoke-DesktopAction -Name CloseWindow }
+                        'take screenshot' { $result = Invoke-DesktopAction -Name TakeScreenshot }
                         'stop listening' {
                             $sender.RecognizeAsyncCancel()
                             $result = 'Listening stopped.'
