@@ -35,7 +35,7 @@ Say one of these commands:
 - “Take screenshot” (sends Print Screen)
 - “Stop listening”
 
-Use `Ctrl+C` to exit at any time. “Close window” sends `Alt+F4` to the foreground window, so save your work first. VoiceDesk intentionally has no shutdown, arbitrary shell, or arbitrary file-opening command in this prototype.
+Use `Ctrl+C` or say “Stop listening” to exit. VoiceDesk reports rejected speech and action errors, and ignores recognized phrases below its confidence threshold. “Close window” sends `Alt+F4` to the foreground window, so save your work first. “Take screenshot” sends Print Screen but does not save an image. VoiceDesk intentionally has no shutdown, arbitrary shell, or arbitrary file-opening command in this prototype.
 
 ## Scope
 
