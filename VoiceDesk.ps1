@@ -404,14 +404,20 @@ if (-not $recognizerInfo) {
                 return
             }
             try {
-                $python = Get-Command python -ErrorAction SilentlyContinue
+                $venvPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
+                if (Test-Path $venvPython) {
+                    $pythonPath = $venvPython
+                } else {
+                    $python = Get-Command python -ErrorAction SilentlyContinue
+                    if (-not $python) { $python = Get-Command py -ErrorAction Stop }
+                    $pythonPath = $python.Source
+                }
                 $pythonArgs = '-u'
-                if (-not $python) {
-                    $python = Get-Command py -ErrorAction Stop
+                if ($pythonPath -eq (Get-Command py -ErrorAction SilentlyContinue).Source) {
                     $pythonArgs = '-3 -u'
                 }
                 $start = [System.Diagnostics.ProcessStartInfo]::new()
-                $start.FileName = $python.Source
+                $start.FileName = $pythonPath
                 $start.Arguments = "$pythonArgs `"$(Join-Path $PSScriptRoot 'gesture_service.py')`""
                 $start.UseShellExecute = $false
                 $start.CreateNoWindow = $true

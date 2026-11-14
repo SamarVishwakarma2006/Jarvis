@@ -5,6 +5,7 @@ Desktop.ini
 .idea/
 __pycache__/
 .venv/
+dist/
 
 # Local configuration and secrets
 .env

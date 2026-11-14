@@ -13,18 +13,24 @@ See [ROADMAP.md](ROADMAP.md) for the GitHub-tracked steps toward a more capable 
 
 ## Run
 
-Open PowerShell in this folder and run:
+For the source preview, extract the GitHub release ZIP and double-click `Run-VoiceDesk.cmd`. Or open PowerShell in this folder and run:
 
 ```powershell
 .\VoiceDesk.ps1
 ```
 
-If PowerShell blocks the script, you can allow it for this process only:
+The launcher allows the script for this process only; it does not change the machine's execution policy.
+
+## Optional features
+
+The core voice commands do not require Node.js or Python. To enable natural-language AI and screen questions, follow [Optional AI intent service](#optional-ai-intent-service). To enable hand gestures, install Python 3.10–3.12 and create an isolated environment:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\VoiceDesk.ps1
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-gestures.txt
 ```
+
+VoiceDesk will use `.venv` for the gesture process when it exists. Camera capture remains off until you press **Start camera gestures**.
 
 Say one of these commands:
 
@@ -53,6 +59,10 @@ py -m pip install -r requirements-gestures.txt
 In VoiceDesk, press **Start camera gestures**. A separate live preview appears and shows when camera processing is active. Hold a fist for about one second to pause voice listening; hold an open palm for about one second to resume it. Closing the preview with `Q` or pressing **Stop camera gestures** stops capture. Hand tracking runs locally; frames are not saved or sent to OpenAI. Only these two gestures are recognized, and gestures cannot close windows or launch apps.
 
 Camera gesture support is optional. If Python, the camera, or the packages are unavailable, voice commands continue to work and VoiceDesk reports the camera error.
+
+## Remove
+
+Close VoiceDesk and delete the extracted `VoiceDesk` folder. If you created `.venv` inside it, deleting the folder removes those gesture packages too. Remove `OPENAI_API_KEY` and `VOICEDESK_MODEL` from Windows Environment Variables if you no longer want the optional AI service configured. Node.js or Python installations are not removed because they may be used by other projects.
 
 ## Optional AI intent service
 
