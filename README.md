@@ -1,6 +1,6 @@
 # VoiceDesk
 
-A small Windows desktop voice-control prototype. VoiceDesk listens for a fixed set of spoken commands and maps them to familiar desktop actions. Its window shows microphone status, recognized speech, the last action, and start/stop controls. It uses Windows' installed speech recognition engine and does not send audio to an AI service.
+A Windows desktop voice-control prototype with an allowlisted set of desktop actions. Exact commands work locally; optional AI maps natural-language requests to those actions. Speech recognition runs on Windows, so raw microphone audio is not sent to the AI service. The app shows microphone status, recognized speech, and action results.
 
 See [ROADMAP.md](ROADMAP.md) for the GitHub-tracked steps toward a more capable assistant.
 
@@ -50,11 +50,14 @@ For screen questions, VoiceDesk first reads accessible text from the active wind
 
 ## Optional camera gestures
 
-Install Python 3.10–3.12, then install the optional gesture dependencies:
+If you have not created the virtual environment yet, install Python 3.10–3.12 and run:
 
 ```powershell
-py -m pip install -r requirements-gestures.txt
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-gestures.txt
 ```
+
+If you already followed the setup above, no additional install command is needed.
 
 In VoiceDesk, press **Start camera gestures**. A separate live preview appears and shows when camera processing is active. Hold a fist for about one second to pause voice listening; hold an open palm for about one second to resume it. Closing the preview with `Q` or pressing **Stop camera gestures** stops capture. Hand tracking runs locally; frames are not saved or sent to OpenAI. Only these two gestures are recognized, and gestures cannot close windows or launch apps.
 
