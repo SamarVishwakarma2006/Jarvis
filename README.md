@@ -30,13 +30,14 @@ Say one of these commands:
 
 - “Open Notepad”
 - “Open Calculator”
+- “Open file” (opens a picker for common document and image formats)
 - “Minimize window”
 - “Maximize window”
 - “Close window”
 - “Take screenshot” (sends Print Screen)
 - “Stop listening”
 
-Press **Start listening** before speaking. Press **Stop listening**, say “Stop listening”, or close the app to stop microphone capture. VoiceDesk shows the recognized phrase and last action, reports microphone/recognition errors, and ignores recognized phrases below its confidence threshold. Window commands identify the foreground window and use Windows UI Automation when available, with a keyboard shortcut fallback; the target title is shown in the action result. If VoiceDesk itself is active, select the window you mean to control and repeat the command. “Close window” may close the target or show its save prompt, so save your work first. “Take screenshot” sends Print Screen but does not save an image. VoiceDesk intentionally has no shutdown, arbitrary shell, or arbitrary file-opening command in this prototype.
+Press **Start listening** before speaking. Press **Stop listening**, say “Stop listening”, or close the app to stop microphone capture. VoiceDesk shows the recognized phrase and last action, reports microphone/recognition errors, and ignores recognized phrases below its confidence threshold. “Open file” opens a picker and only accepts common document and image formats; voice text is never treated as a path. Window commands identify the foreground window and use Windows UI Automation when available, with a keyboard shortcut fallback; the target title is shown in the action result. If VoiceDesk itself is active, select the window you mean to control and repeat the command. “Close window” may close the target or show its save prompt, so save your work first. “Take screenshot” sends Print Screen but does not save an image. VoiceDesk intentionally has no shutdown or arbitrary shell command in this prototype.
 
 ## Scope
 

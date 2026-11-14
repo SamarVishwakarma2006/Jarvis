@@ -32,11 +32,33 @@ function Get-ActiveTarget {
 }
 
 function Invoke-DesktopAction {
-    param([Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name)
+    param([Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','OpenFile','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name)
 
     switch ($Name) {
         'OpenNotepad' { Start-Process notepad; return 'Opened Notepad.' }
         'OpenCalculator' { Start-Process calc; return 'Opened Calculator.' }
+        'OpenFile' {
+            $selection = @{ Path = $null }
+            $form.Invoke([System.Action] {
+                $dialog = [System.Windows.Forms.OpenFileDialog]::new()
+                $dialog.Title = 'Choose a file to open'
+                $dialog.Filter = 'Documents and images|*.txt;*.md;*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.csv;*.png;*.jpg;*.jpeg;*.gif;*.bmp|All files (*.*)|*.*'
+                $dialog.CheckFileExists = $true
+                $dialog.Multiselect = $false
+                if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
+                    $selection.Path = $dialog.FileName
+                }
+                $dialog.Dispose()
+            }) | Out-Null
+
+            if (-not $selection.Path) { return 'File selection cancelled.' }
+            if (-not [System.IO.File]::Exists($selection.Path)) { throw 'The selected file no longer exists.' }
+            $allowedExtensions = @('.txt','.md','.pdf','.doc','.docx','.xls','.xlsx','.ppt','.pptx','.csv','.png','.jpg','.jpeg','.gif','.bmp')
+            $extension = [System.IO.Path]::GetExtension($selection.Path).ToLowerInvariant()
+            if ($extension -notin $allowedExtensions) { throw "Files ending in '$extension' are not supported by the file picker." }
+            Start-Process -FilePath $selection.Path
+            return "Opened '$([System.IO.Path]::GetFileName($selection.Path))' in its default app."
+        }
     }
 
     $target = Get-ActiveTarget
@@ -119,7 +141,7 @@ $listenButton.Text = 'Start listening'
 $listenButton.AutoSize = $true
 $listenButton.MinimumSize = [System.Drawing.Size]::new(180, 42)
 $commands = [System.Windows.Forms.Label]::new()
-$commands.Text = 'Commands: open notepad · open calculator · minimize/maximize/close window · take screenshot · stop listening'
+$commands.Text = 'Commands: open notepad · open calculator · open file · minimize/maximize/close window · take screenshot · stop listening'
 $commands.AutoSize = $true
 $commands.MaximumSize = [System.Drawing.Size]::new(400, 0)
 
@@ -139,7 +161,7 @@ if (-not $recognizerInfo) {
     try {
         $recognizer = [System.Speech.Recognition.SpeechRecognitionEngine]::new($recognizerInfo)
         $choices = [System.Speech.Recognition.Choices]::new(
-            'open notepad', 'open calculator', 'minimize window', 'maximize window',
+            'open notepad', 'open calculator', 'open file', 'minimize window', 'maximize window',
             'close window', 'take screenshot', 'stop listening'
         )
         $builder = [System.Speech.Recognition.GrammarBuilder]::new()
@@ -172,6 +194,7 @@ if (-not $recognizerInfo) {
                     switch ($command) {
                         'open notepad' { $result = Invoke-DesktopAction -Name OpenNotepad }
                         'open calculator' { $result = Invoke-DesktopAction -Name OpenCalculator }
+                        'open file' { $result = Invoke-DesktopAction -Name OpenFile }
                         'minimize window' { $result = Invoke-DesktopAction -Name MinimizeWindow }
                         'maximize window' { $result = Invoke-DesktopAction -Name MaximizeWindow }
                         'close window' { $result = Invoke-DesktopAction -Name CloseWindow }
