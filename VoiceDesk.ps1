@@ -260,12 +260,14 @@ $layout.Dock = 'Fill'
 $layout.Padding = [System.Windows.Forms.Padding]::new(20)
 $layout.ColumnCount = 1
 $layout.RowCount = 8
-$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
-$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
-$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('Percent', 100))
-$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
-$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
-$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('Percent', 100))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 
 $status = [System.Windows.Forms.Label]::new()
 $status.Text = 'Microphone off'
