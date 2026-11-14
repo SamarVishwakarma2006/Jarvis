@@ -3,6 +3,8 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+__pycache__/
+.venv/
 
 # Local configuration and secrets
 .env

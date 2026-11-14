@@ -251,15 +251,15 @@ $recognizerInfo = [System.Speech.Recognition.SpeechRecognitionEngine]::Installed
 $form = [System.Windows.Forms.Form]::new()
 $form.Text = 'VoiceDesk'
 $form.StartPosition = 'CenterScreen'
-$form.Size = [System.Drawing.Size]::new(480, 360)
-$form.MinimumSize = [System.Drawing.Size]::new(420, 320)
+$form.Size = [System.Drawing.Size]::new(500, 430)
+$form.MinimumSize = [System.Drawing.Size]::new(440, 390)
 $form.Font = [System.Drawing.Font]::new('Segoe UI', 10)
 
 $layout = [System.Windows.Forms.TableLayoutPanel]::new()
 $layout.Dock = 'Fill'
 $layout.Padding = [System.Windows.Forms.Padding]::new(20)
 $layout.ColumnCount = 1
-$layout.RowCount = 6
+$layout.RowCount = 8
 $layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 $layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 $layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('Percent', 100))
@@ -292,6 +292,13 @@ $commands = [System.Windows.Forms.Label]::new()
 $commands.Text = 'Exact basic commands work offline. Other requests and screen questions may send text to OpenAI. Screenshots are previewed first; internet access and API charges may apply.'
 $commands.AutoSize = $true
 $commands.MaximumSize = [System.Drawing.Size]::new(400, 0)
+$cameraStatus = [System.Windows.Forms.Label]::new()
+$cameraStatus.Text = 'Camera off'
+$cameraStatus.AutoSize = $true
+$gestureButton = [System.Windows.Forms.Button]::new()
+$gestureButton.Text = 'Start camera gestures'
+$gestureButton.AutoSize = $true
+$gestureButton.MinimumSize = [System.Drawing.Size]::new(180, 38)
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -299,8 +306,10 @@ $layout.Controls.Add($transcript, 0, 2)
 $layout.Controls.Add($lastAction, 0, 3)
 $layout.Controls.Add($listenButton, 0, 4)
 $layout.Controls.Add($commands, 0, 5)
+$layout.Controls.Add($cameraStatus, 0, 6)
+$layout.Controls.Add($gestureButton, 0, 7)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false }
+$state = @{ Listening = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false }
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
@@ -314,6 +323,18 @@ if (-not $recognizerInfo) {
         } catch {
             $hint.Text = "Microphone unavailable. Connect or enable one and check Windows microphone privacy settings. $($_.Exception.Message)"
             $listenButton.Enabled = $false
+        }
+
+        function Start-VoiceListening {
+            if ($state.Listening) { return }
+            $state.Listening = $true
+            $status.Text = 'Listening…'
+            $hint.Text = 'Listening. Exact commands stay on this PC; other recognized requests are sent to OpenAI.'
+            $listenButton.Text = 'Stop listening'
+            $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
+        }
+        function Stop-VoiceListening {
+            if ($state.Listening) { $recognizer.RecognizeAsyncCancel() }
         }
 
         $recognizer.add_SpeechRecognitionRejected({
@@ -359,15 +380,12 @@ if (-not $recognizerInfo) {
 
         $listenButton.add_Click({
             if ($state.Listening) {
+                $state.GesturePaused = $false
                 $recognizer.RecognizeAsyncCancel()
                 $hint.Text = 'Stopping microphone…'
             } else {
                 try {
-                    $state.Listening = $true
-                    $status.Text = 'Listening…'
-                    $hint.Text = 'Listening. Exact commands stay on this PC; other recognized requests are sent to OpenAI. Press Stop listening to stop.'
-                    $listenButton.Text = 'Stop listening'
-                    $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
+                    Start-VoiceListening
                 } catch {
                     $state.Listening = $false
                     $status.Text = 'Microphone off'
@@ -376,7 +394,101 @@ if (-not $recognizerInfo) {
                 }
             }
         })
+        $gestureButton.add_Click({
+            if ($state.GesturesActive -and $state.GestureProcess) {
+                try { $state.GestureProcess.Kill() } catch {}
+                $state.GesturesActive = $false
+                $state.GesturePaused = $false
+                $cameraStatus.Text = 'Camera off'
+                $gestureButton.Text = 'Start camera gestures'
+                return
+            }
+            try {
+                $python = Get-Command python -ErrorAction SilentlyContinue
+                $pythonArgs = '-u'
+                if (-not $python) {
+                    $python = Get-Command py -ErrorAction Stop
+                    $pythonArgs = '-3 -u'
+                }
+                $start = [System.Diagnostics.ProcessStartInfo]::new()
+                $start.FileName = $python.Source
+                $start.Arguments = "$pythonArgs `"$(Join-Path $PSScriptRoot 'gesture_service.py')`""
+                $start.UseShellExecute = $false
+                $start.CreateNoWindow = $true
+                $start.RedirectStandardOutput = $true
+                $start.RedirectStandardError = $true
+                $process = [System.Diagnostics.Process]::new()
+                $process.StartInfo = $start
+                $process.add_OutputDataReceived({
+                    param($sender, $eventArgs)
+                    $line = $eventArgs.Data
+                    if (-not $line) { return }
+                    $form.BeginInvoke([System.Action] {
+                        switch ($line) {
+                            'CAMERA_ACTIVE' {
+                                $state.GesturesActive = $true
+                                $cameraStatus.Text = 'Camera active (local processing)'
+                                $gestureButton.Text = 'Stop camera gestures'
+                            }
+                            'PAUSE_VOICE' {
+                                if ($state.Listening) {
+                                    $state.GesturePaused = $true
+                                    Stop-VoiceListening
+                                    $hint.Text = 'Gesture paused voice listening. Show an open palm to resume.'
+                                }
+                            }
+                            'RESUME_VOICE' {
+                                if ($state.GesturePaused) {
+                                    $state.GesturePaused = $false
+                                    try { Start-VoiceListening } catch { $hint.Text = "Gesture could not resume voice: $($_.Exception.Message)" }
+                                }
+                            }
+                            'CAMERA_STOPPED' {
+                                $state.GesturesActive = $false
+                                $cameraStatus.Text = 'Camera off'
+                                $gestureButton.Text = 'Start camera gestures'
+                            }
+                            default {
+                                if ($line.StartsWith('ERROR:')) {
+                                    $cameraStatus.Text = 'Camera error'
+                                    $lastAction.Text = $line
+                                }
+                            }
+                        }
+                    }) | Out-Null
+                })
+                $process.add_ErrorDataReceived({
+                    param($sender, $eventArgs)
+                    if ($eventArgs.Data) {
+                        $line = $eventArgs.Data
+                        $form.BeginInvoke([System.Action] { $cameraStatus.Text = "Camera setup error: $line" }) | Out-Null
+                    }
+                })
+                $process.add_Exited({
+                    $form.BeginInvoke([System.Action] {
+                        $state.GesturesActive = $false
+                        $state.GesturePaused = $false
+                        $cameraStatus.Text = 'Camera off'
+                        $gestureButton.Text = 'Start camera gestures'
+                    }) | Out-Null
+                })
+                $process.Start() | Out-Null
+                $state.GestureProcess = $process
+                $state.GesturesActive = $true
+                $cameraStatus.Text = 'Starting camera…'
+                $gestureButton.Text = 'Stop camera gestures'
+                $process.BeginOutputReadLine()
+                $process.BeginErrorReadLine()
+            } catch {
+                $state.GesturesActive = $false
+                $state.GestureProcess = $null
+                $cameraStatus.Text = 'Camera off'
+                $gestureButton.Text = 'Start camera gestures'
+                $lastAction.Text = "Could not start gestures: $($_.Exception.Message)"
+            }
+        })
         $form.add_FormClosing({
+            if ($state.GestureProcess) { try { $state.GestureProcess.Kill() } catch {} }
             if ($recognizer) {
                 try { $recognizer.RecognizeAsyncCancel() } catch {}
                 $recognizer.Dispose()

@@ -42,6 +42,18 @@ Press **Start listening** before speaking. Press **Stop listening**, say “Stop
 
 For screen questions, VoiceDesk first reads accessible text from the active window and sends that text with the question to OpenAI. If the window exposes too little accessible text, it captures a scaled image of the virtual desktop and shows a preview. Nothing in that screenshot is sent unless you press **Send to OpenAI**; **Cancel** discards it. Screen content and spoken questions can contain private information, so only ask about screens you want sent for cloud analysis. VoiceDesk does not save screen text or screenshots to disk. It has no shutdown or arbitrary shell command.
 
+## Optional camera gestures
+
+Install Python 3.10–3.12, then install the optional gesture dependencies:
+
+```powershell
+py -m pip install -r requirements-gestures.txt
+```
+
+In VoiceDesk, press **Start camera gestures**. A separate live preview appears and shows when camera processing is active. Hold a fist for about one second to pause voice listening; hold an open palm for about one second to resume it. Closing the preview with `Q` or pressing **Stop camera gestures** stops capture. Hand tracking runs locally; frames are not saved or sent to OpenAI. Only these two gestures are recognized, and gestures cannot close windows or launch apps.
+
+Camera gesture support is optional. If Python, the camera, or the packages are unavailable, voice commands continue to work and VoiceDesk reports the camera error.
+
 ## Optional AI intent service
 
 Natural-language requests use a small local Node.js service that holds the OpenAI API key outside VoiceDesk and the repository. Install Node.js, set `OPENAI_API_KEY` and `VOICEDESK_MODEL` in your Windows user environment, then start the service in one PowerShell window:
