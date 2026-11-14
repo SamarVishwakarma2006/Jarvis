@@ -94,6 +94,51 @@ function Invoke-DesktopAction {
     }
 }
 
+function Resolve-VoiceIntent {
+    param([Parameter(Mandatory)][string]$Text)
+    $localIntents = @{
+        'open notepad' = 'open_notepad'; 'open calculator' = 'open_calculator'; 'open file' = 'open_file'
+        'minimize window' = 'minimize_window'; 'maximize window' = 'maximize_window'
+        'close window' = 'close_window'; 'take screenshot' = 'take_screenshot'
+    }
+    $normalized = $Text.Trim().ToLowerInvariant()
+    if ($localIntents.ContainsKey($normalized)) {
+        return @{ intent = $localIntents[$normalized]; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window') }
+    }
+
+    $payload = @{ text = $Text } | ConvertTo-Json -Compress
+    $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 20
+    $allowed = @('open_notepad','open_calculator','open_file','minimize_window','maximize_window','close_window','take_screenshot','unknown')
+    if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
+        throw 'AI returned an invalid action. No desktop action was run.'
+    }
+    if ($intent.intent -eq 'close_window') { $intent.requires_confirmation = $true }
+    return $intent
+}
+
+function Invoke-IntentFromVoice {
+    param([Parameter(Mandatory)]$Intent)
+    if ($Intent.intent -eq 'unknown') { return $Intent.reply }
+    if ($Intent.requires_confirmation -or $Intent.intent -eq 'close_window') {
+        $confirmation = @{ Approved = $false }
+        $form.Invoke([System.Action] {
+            $answer = [System.Windows.Forms.MessageBox]::Show(
+                $form, "Close the active window?`r`n`r`n$($Intent.reply)", 'Confirm close window',
+                [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning
+            )
+            $confirmation.Approved = ($answer -eq [System.Windows.Forms.DialogResult]::Yes)
+        }) | Out-Null
+        if (-not $confirmation.Approved) { return 'Cancelled. The window was not closed.' }
+    }
+    $actionName = @{
+        open_notepad = 'OpenNotepad'; open_calculator = 'OpenCalculator'; open_file = 'OpenFile'
+        minimize_window = 'MinimizeWindow'; maximize_window = 'MaximizeWindow'; close_window = 'CloseWindow'
+        take_screenshot = 'TakeScreenshot'
+    }[$Intent.intent]
+    if (-not $actionName) { return 'Unknown request. No action was run.' }
+    return Invoke-DesktopAction -Name $actionName
+}
+
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $culture = (Get-Culture).Name
 $recognizerInfo = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers() |
@@ -141,7 +186,7 @@ $listenButton.Text = 'Start listening'
 $listenButton.AutoSize = $true
 $listenButton.MinimumSize = [System.Drawing.Size]::new(180, 42)
 $commands = [System.Windows.Forms.Label]::new()
-$commands.Text = 'Commands: open notepad · open calculator · open file · minimize/maximize/close window · take screenshot · stop listening'
+$commands.Text = 'Exact basic commands work offline. Other requests send the transcript to OpenAI for interpretation; internet access and API usage charges may apply.'
 $commands.AutoSize = $true
 $commands.MaximumSize = [System.Drawing.Size]::new(400, 0)
 
@@ -160,13 +205,7 @@ if (-not $recognizerInfo) {
 } else {
     try {
         $recognizer = [System.Speech.Recognition.SpeechRecognitionEngine]::new($recognizerInfo)
-        $choices = [System.Speech.Recognition.Choices]::new(
-            'open notepad', 'open calculator', 'open file', 'minimize window', 'maximize window',
-            'close window', 'take screenshot', 'stop listening'
-        )
-        $builder = [System.Speech.Recognition.GrammarBuilder]::new()
-        $builder.Append($choices)
-        $recognizer.LoadGrammar([System.Speech.Recognition.Grammar]::new($builder))
+        $recognizer.LoadGrammar([System.Speech.Recognition.DictationGrammar]::new())
         try {
             $recognizer.SetInputToDefaultAudioDevice()
         } catch {
@@ -191,22 +230,15 @@ if (-not $recognizerInfo) {
                 $result = 'Ignored: recognition confidence was too low.'
             } else {
                 try {
-                    switch ($command) {
-                        'open notepad' { $result = Invoke-DesktopAction -Name OpenNotepad }
-                        'open calculator' { $result = Invoke-DesktopAction -Name OpenCalculator }
-                        'open file' { $result = Invoke-DesktopAction -Name OpenFile }
-                        'minimize window' { $result = Invoke-DesktopAction -Name MinimizeWindow }
-                        'maximize window' { $result = Invoke-DesktopAction -Name MaximizeWindow }
-                        'close window' { $result = Invoke-DesktopAction -Name CloseWindow }
-                        'take screenshot' { $result = Invoke-DesktopAction -Name TakeScreenshot }
-                        'stop listening' {
-                            $sender.RecognizeAsyncCancel()
-                            $result = 'Listening stopped.'
-                        }
-                        default { $result = 'Ignored: command is not allowlisted.' }
+                    if ($command.Trim().ToLowerInvariant() -eq 'stop listening') {
+                        $sender.RecognizeAsyncCancel()
+                        $result = 'Listening stopped.'
+                    } else {
+                        $intent = Resolve-VoiceIntent -Text $command
+                        $result = Invoke-IntentFromVoice -Intent $intent
                     }
                 } catch {
-                    $result = "Action failed: $($_.Exception.Message)"
+                    $result = "No action was run: $($_.Exception.Message)"
                 }
             }
             $form.BeginInvoke([System.Action] { $lastAction.Text = "Last action: $result" }) | Out-Null
@@ -230,7 +262,7 @@ if (-not $recognizerInfo) {
                 try {
                     $state.Listening = $true
                     $status.Text = 'Listening…'
-                    $hint.Text = 'VoiceDesk is listening. Press Stop listening or say “stop listening”.'
+                    $hint.Text = 'Listening. Exact commands stay on this PC; other recognized requests are sent to OpenAI. Press Stop listening to stop.'
                     $listenButton.Text = 'Stop listening'
                     $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
                 } catch {

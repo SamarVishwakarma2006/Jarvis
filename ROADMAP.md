@@ -4,16 +4,16 @@ Build a dependable Windows voice assistant in small, reviewable releases. The ta
 
 ## How to track the work on GitHub
 
-Create one GitHub Issue for each numbered step. Copy its checklist into the issue, label it `enhancement`, and close it with the step's commit or pull request. Do one step per feature branch and open a pull request before merging to `master`.
+Create one GitHub Issue for each numbered step. Copy its checklist into the issue, label it `enhancement`, and close it with the step's commit or pull request. Do every step directly on `master`, as requested. Commit and push each completed step so GitHub records progress.
 
-The repository's GitHub remote is named `origin`. Replace `<issue-number>` in commit messages with the issue created for that step. Start each branch from the latest `master`:
+The repository's GitHub remote is named `origin`. Replace `<issue-number>` in commit messages with the issue created for that step. Before starting a step, sync the same `master` branch:
 
 ```powershell
 git switch master
 git pull --ff-only origin master
 ```
 
-After merging a step's pull request, repeat those two commands before starting the next step. If your default branch is named `main`, substitute `main` for `master` throughout.
+After pushing a step, repeat those two commands before starting the next one. If your default branch is named `main`, substitute `main` for `master` throughout.
 
 ## Step 1 — Make the voice prototype dependable
 
@@ -32,7 +32,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/voice-reliability
 ```
 
 After work:
@@ -40,7 +39,7 @@ After work:
 ```powershell
 git add VoiceDesk.ps1 README.md
 git commit -m "Improve voice command reliability (Closes #<issue-number>)"
-git push -u origin feature/voice-reliability
+git push origin master
 ```
 
 ## Step 2 — Add a real desktop interface
@@ -59,7 +58,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/desktop-interface
 ```
 
 After work:
@@ -67,7 +65,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Add a Windows desktop interface (Closes #<issue-number>)"
-git push -u origin feature/desktop-interface
+git push origin master
 ```
 
 ## Step 3 — Make desktop actions reliable and bounded
@@ -86,7 +84,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/desktop-actions
 ```
 
 After work:
@@ -94,7 +91,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Add safe Windows UI automation actions (Closes #<issue-number>)"
-git push -u origin feature/desktop-actions
+git push origin master
 ```
 
 ## Step 4 — Open apps and files safely
@@ -113,7 +110,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/open-apps-and-files
 ```
 
 After work:
@@ -121,7 +117,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Add safe app and file opening (Closes #<issue-number>)"
-git push -u origin feature/open-apps-and-files
+git push origin master
 ```
 
 ## Step 5 — Add AI intent understanding
@@ -141,7 +137,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/ai-intent
 ```
 
 After work:
@@ -149,7 +144,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Add validated AI intent handling (Closes #<issue-number>)"
-git push -u origin feature/ai-intent
+git push origin master
 ```
 
 ## Step 6 — Let the assistant understand the screen
@@ -168,7 +163,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/screen-awareness
 ```
 
 After work:
@@ -176,7 +170,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Add user-controlled screen awareness (Closes #<issue-number>)"
-git push -u origin feature/screen-awareness
+git push origin master
 ```
 
 ## Step 7 — Add optional camera gestures
@@ -195,7 +189,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c feature/optional-gestures
 ```
 
 After work:
@@ -203,7 +196,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Add optional camera gestures (Closes #<issue-number>)"
-git push -u origin feature/optional-gestures
+git push origin master
 ```
 
 ## Step 8 — Package and publish a usable release
@@ -222,7 +215,6 @@ Before work:
 ```powershell
 git switch master
 git pull --ff-only origin master
-git switch -c release/first-public-build
 ```
 
 After work:
@@ -230,7 +222,7 @@ After work:
 ```powershell
 git add -A
 git commit -m "Prepare the first public release (Closes #<issue-number>)"
-git push -u origin release/first-public-build
+git push origin master
 ```
 
 ## Design rule for every step
