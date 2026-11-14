@@ -31,13 +31,16 @@ Say one of these commands:
 - “Open Notepad”
 - “Open Calculator”
 - “Open file” (opens a picker for common document and image formats)
+- “What is on my screen?” (asks AI about the active window)
 - “Minimize window”
 - “Maximize window”
 - “Close window”
 - “Take screenshot” (sends Print Screen)
 - “Stop listening”
 
-Press **Start listening** before speaking. Press **Stop listening**, say “Stop listening”, or close the app to stop microphone capture. Windows speech recognition transcribes locally. Exact basic commands are handled locally; other recognized requests are sent to OpenAI for intent interpretation. Internet access and API usage charges may apply. VoiceDesk shows the recognized phrase and last action, reports microphone/recognition errors, and ignores recognized phrases below its confidence threshold. “Open file” opens a picker and only accepts common document and image formats; voice text is never treated as a path. Window commands identify the foreground window and use Windows UI Automation when available, with a keyboard shortcut fallback; the target title is shown in the action result. If VoiceDesk itself is active, select the window you mean to control and repeat the command. “Close window” always asks for confirmation and may show the target app's save prompt. “Take screenshot” sends Print Screen but does not save an image. VoiceDesk intentionally has no shutdown or arbitrary shell command.
+Press **Start listening** before speaking. Press **Stop listening**, say “Stop listening”, or close the app to stop microphone capture. Windows speech recognition transcribes locally. Exact basic commands are handled locally; other recognized requests are sent to OpenAI for intent interpretation. Internet access and API usage charges may apply. VoiceDesk shows the recognized phrase and last action, reports microphone/recognition errors, and ignores recognized phrases below its confidence threshold. “Open file” opens a picker and only accepts common document and image formats; voice text is never treated as a path. Window commands identify the foreground window and use Windows UI Automation when available, with a keyboard shortcut fallback; the target title is shown in the action result. If VoiceDesk itself is active, select the window you mean to control and repeat the command. “Close window” always asks for confirmation and may show the target app's save prompt. “Take screenshot” sends Print Screen but does not save an image.
+
+For screen questions, VoiceDesk first reads accessible text from the active window and sends that text with the question to OpenAI. If the window exposes too little accessible text, it captures a scaled image of the virtual desktop and shows a preview. Nothing in that screenshot is sent unless you press **Send to OpenAI**; **Cancel** discards it. Screen content and spoken questions can contain private information, so only ask about screens you want sent for cloud analysis. VoiceDesk does not save screen text or screenshots to disk. It has no shutdown or arbitrary shell command.
 
 ## Optional AI intent service
 

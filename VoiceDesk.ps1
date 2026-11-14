@@ -100,25 +100,128 @@ function Resolve-VoiceIntent {
         'open notepad' = 'open_notepad'; 'open calculator' = 'open_calculator'; 'open file' = 'open_file'
         'minimize window' = 'minimize_window'; 'maximize window' = 'maximize_window'
         'close window' = 'close_window'; 'take screenshot' = 'take_screenshot'
+        'what is on my screen' = 'screen_question'; 'what is on the screen' = 'screen_question'
     }
     $normalized = $Text.Trim().ToLowerInvariant()
     if ($localIntents.ContainsKey($normalized)) {
-        return @{ intent = $localIntents[$normalized]; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window') }
+        return @{ intent = $localIntents[$normalized]; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window'); question = $Text }
     }
 
     $payload = @{ text = $Text } | ConvertTo-Json -Compress
     $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 20
-    $allowed = @('open_notepad','open_calculator','open_file','minimize_window','maximize_window','close_window','take_screenshot','unknown')
+    $allowed = @('open_notepad','open_calculator','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','unknown')
     if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
         throw 'AI returned an invalid action. No desktop action was run.'
     }
     if ($intent.intent -eq 'close_window') { $intent.requires_confirmation = $true }
+    $intent | Add-Member -NotePropertyName question -NotePropertyValue $Text -Force
     return $intent
+}
+
+function Get-ActiveWindowText {
+    $target = Get-ActiveTarget
+    $elements = $target.Element.FindAll(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition
+    )
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $count = [Math]::Min($elements.Count, 100)
+    for ($index = 0; $index -lt $count; $index++) {
+        try {
+            $element = $elements.Item($index)
+            $name = $element.Current.Name
+            if (-not [string]::IsNullOrWhiteSpace($name)) {
+                $type = $element.Current.ControlType.ProgrammaticName
+                $lines.Add("$type`: $name")
+            }
+        } catch { }
+    }
+    return @{ Title = $target.Title; Text = ($lines -join "`n") }
+}
+
+function Get-ScreenAnswer {
+    param([Parameter(Mandatory)][string]$Question)
+    try {
+        $context = Get-ActiveWindowText
+    } catch {
+        $context = @{ Title = 'Active desktop'; Text = '' }
+    }
+    $request = @{ text = $Question; screenText = "Window: $($context.Title)`n$($context.Text)" }
+    $imageData = $null
+    if ($context.Text.Length -lt 80) {
+        $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+        $source = [System.Drawing.Bitmap]::new($bounds.Width, $bounds.Height)
+        $sourceGraphics = [System.Drawing.Graphics]::FromImage($source)
+        $sourceGraphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+        $scale = [Math]::Min(1.0, 1600.0 / [Math]::Max($bounds.Width, $bounds.Height))
+        $previewImage = [System.Drawing.Bitmap]::new([int]($bounds.Width * $scale), [int]($bounds.Height * $scale))
+        $previewGraphics = [System.Drawing.Graphics]::FromImage($previewImage)
+        $previewGraphics.DrawImage($source, 0, 0, $previewImage.Width, $previewImage.Height)
+        $sourceGraphics.Dispose()
+        $source.Dispose()
+
+        $memory = [System.IO.MemoryStream]::new()
+        $previewImage.Save($memory, [System.Drawing.Imaging.ImageFormat]::Png)
+        $imageData = 'data:image/png;base64,' + [Convert]::ToBase64String($memory.ToArray())
+        $memory.Dispose()
+
+        $preview = [System.Windows.Forms.Form]::new()
+        $preview.Text = 'Review screenshot before sending'
+        $preview.StartPosition = 'CenterParent'
+        $preview.Size = [System.Drawing.Size]::new(850, 650)
+        $picture = [System.Windows.Forms.PictureBox]::new()
+        $picture.Dock = 'Fill'
+        $picture.SizeMode = 'Zoom'
+        $picture.Image = $previewImage
+        $footer = [System.Windows.Forms.Panel]::new()
+        $footer.Dock = 'Bottom'
+        $footer.Height = 76
+        $notice = [System.Windows.Forms.Label]::new()
+        $notice.Text = 'This screenshot may contain private information. It will be sent to OpenAI only if you choose Send.'
+        $notice.Dock = 'Top'
+        $notice.AutoSize = $true
+        $send = [System.Windows.Forms.Button]::new()
+        $send.Text = 'Send to OpenAI'
+        $send.Width = 145
+        $send.Height = 36
+        $send.Location = [System.Drawing.Point]::new(670, 28)
+        $send.DialogResult = [System.Windows.Forms.DialogResult]::Yes
+        $cancel = [System.Windows.Forms.Button]::new()
+        $cancel.Text = 'Cancel'
+        $cancel.Width = 90
+        $cancel.Height = 36
+        $cancel.Location = [System.Drawing.Point]::new(570, 28)
+        $cancel.DialogResult = [System.Windows.Forms.DialogResult]::No
+        $footer.Controls.Add($notice)
+        $footer.Controls.Add($send)
+        $footer.Controls.Add($cancel)
+        $preview.Controls.Add($picture)
+        $preview.Controls.Add($footer)
+        $preview.AcceptButton = $send
+        $preview.CancelButton = $cancel
+        $decision = @{ Send = $false }
+        try {
+            $form.Invoke([System.Action] {
+                $decision.Send = ($preview.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::Yes)
+            }) | Out-Null
+        } finally {
+            $previewImage.Dispose()
+            $preview.Dispose()
+            $previewGraphics.Dispose()
+        }
+        if (-not $decision.Send) { return 'Screenshot cancelled. Nothing was sent.' }
+        $request.image = $imageData
+    }
+
+    $body = $request | ConvertTo-Json -Depth 4 -Compress
+    $answer = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/screen' -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 45
+    return $answer.answer
 }
 
 function Invoke-IntentFromVoice {
     param([Parameter(Mandatory)]$Intent)
     if ($Intent.intent -eq 'unknown') { return $Intent.reply }
+    if ($Intent.intent -eq 'screen_question') { return Get-ScreenAnswer -Question $Intent.question }
     if ($Intent.requires_confirmation -or $Intent.intent -eq 'close_window') {
         $confirmation = @{ Approved = $false }
         $form.Invoke([System.Action] {
@@ -186,7 +289,7 @@ $listenButton.Text = 'Start listening'
 $listenButton.AutoSize = $true
 $listenButton.MinimumSize = [System.Drawing.Size]::new(180, 42)
 $commands = [System.Windows.Forms.Label]::new()
-$commands.Text = 'Exact basic commands work offline. Other requests send the transcript to OpenAI for interpretation; internet access and API usage charges may apply.'
+$commands.Text = 'Exact basic commands work offline. Other requests and screen questions may send text to OpenAI. Screenshots are previewed first; internet access and API charges may apply.'
 $commands.AutoSize = $true
 $commands.MaximumSize = [System.Drawing.Size]::new(400, 0)
 
