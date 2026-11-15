@@ -16,7 +16,9 @@ public static class VoiceDeskNative {
 '@
 
 function Get-ActiveTarget {
-    $handle = [VoiceDeskNative]::GetForegroundWindow()
+    param([IntPtr]$Handle = [IntPtr]::Zero)
+    if ($Handle -eq [IntPtr]::Zero) { $Handle = [VoiceDeskNative]::GetForegroundWindow() }
+    $handle = $Handle
     if ($handle -eq [IntPtr]::Zero) { throw 'No foreground window was found.' }
     if ($handle -eq $form.Handle) { throw 'VoiceDesk is the active window. Select the window you want to control, then try again.' }
 
@@ -32,7 +34,10 @@ function Get-ActiveTarget {
 }
 
 function Invoke-DesktopAction {
-    param([Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','OpenFile','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name)
+    param(
+        [Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','OpenFile','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name,
+        [IntPtr]$TargetHandle = [IntPtr]::Zero
+    )
 
     switch ($Name) {
         'OpenNotepad' { Start-Process notepad; return 'Opened Notepad.' }
@@ -61,14 +66,14 @@ function Invoke-DesktopAction {
         }
     }
 
-    $target = Get-ActiveTarget
+    $target = Get-ActiveTarget -Handle $TargetHandle
     if ($Name -eq 'TakeScreenshot') {
         [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}')
         return "Sent Print Screen for '$($target.Title)'; no image file was saved."
     }
 
     try {
-        if ([VoiceDeskNative]::GetForegroundWindow() -ne $target.Handle) {
+        if ($TargetHandle -eq [IntPtr]::Zero -and [VoiceDeskNative]::GetForegroundWindow() -ne $target.Handle) {
             throw 'The active window changed before the action could run.'
         }
         $pattern = $null
@@ -83,7 +88,7 @@ function Invoke-DesktopAction {
     } catch {
         # The active window is checked again before the keyboard fallback.
         if ([VoiceDeskNative]::GetForegroundWindow() -ne $target.Handle) {
-            throw "The active window changed before the fallback action could run. $($_.Exception.Message)"
+            throw "UI Automation could not control '$($target.Title)', and it is not the foreground window for a safe keyboard fallback. No shortcut was sent. $($_.Exception.Message)"
         }
         switch ($Name) {
             'MinimizeWindow' { [System.Windows.Forms.SendKeys]::SendWait('% n') }
@@ -113,7 +118,7 @@ function Resolve-VoiceIntent {
     if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
         throw 'AI returned an invalid action. No desktop action was run.'
     }
-    if ($intent.intent -eq 'close_window') { $intent.requires_confirmation = $true }
+    $intent.requires_confirmation = ($intent.intent -eq 'close_window')
     $intent | Add-Member -NotePropertyName question -NotePropertyValue $Text -Force
     return $intent
 }
@@ -222,11 +227,13 @@ function Invoke-IntentFromVoice {
     param([Parameter(Mandatory)]$Intent)
     if ($Intent.intent -eq 'unknown') { return $Intent.reply }
     if ($Intent.intent -eq 'screen_question') { return Get-ScreenAnswer -Question $Intent.question }
-    if ($Intent.requires_confirmation -or $Intent.intent -eq 'close_window') {
+    $target = $null
+    if ($Intent.intent -eq 'close_window') {
+        $target = Get-ActiveTarget
         $confirmation = @{ Approved = $false }
         $form.Invoke([System.Action] {
             $answer = [System.Windows.Forms.MessageBox]::Show(
-                $form, "Close the active window?`r`n`r`n$($Intent.reply)", 'Confirm close window',
+                $form, "Close '$($target.Title)'?`r`n`r`n$($Intent.reply)", 'Confirm close window',
                 [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning
             )
             $confirmation.Approved = ($answer -eq [System.Windows.Forms.DialogResult]::Yes)
@@ -239,6 +246,7 @@ function Invoke-IntentFromVoice {
         take_screenshot = 'TakeScreenshot'
     }[$Intent.intent]
     if (-not $actionName) { return 'Unknown request. No action was run.' }
+    if ($target) { return Invoke-DesktopAction -Name $actionName -TargetHandle $target.Handle }
     return Invoke-DesktopAction -Name $actionName
 }
 

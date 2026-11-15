@@ -76,7 +76,7 @@ const server = http.createServer(async (request, response) => {
     const output = data.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text;
     if (!output) throw new Error('The model returned no structured intent.');
     const intent = JSON.parse(output);
-    if (intent.intent === 'close_window') intent.requires_confirmation = true;
+    intent.requires_confirmation = intent.intent === 'close_window';
     response.writeHead(200).end(JSON.stringify(intent));
   } catch (error) {
     response.writeHead(400).end(JSON.stringify({ error: error.message }));
