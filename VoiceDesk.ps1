@@ -109,7 +109,15 @@ function Resolve-VoiceIntent {
     }
     $normalized = $Text.Trim().ToLowerInvariant()
     if ($localIntents.ContainsKey($normalized)) {
-        return @{ intent = $localIntents[$normalized]; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window'); question = $Text }
+        $localIntent = $localIntents[$normalized]
+        if ($localIntent -eq 'screen_question' -and -not $state.AiEnabled) {
+            return @{ intent = 'unknown'; reply = 'Cloud AI is off. Enable it in VoiceDesk to ask questions about the screen.'; question = $Text }
+        }
+        return @{ intent = $localIntent; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window'); question = $Text }
+    }
+
+    if (-not $state.AiEnabled) {
+        return @{ intent = 'unknown'; reply = 'Cloud AI is off. Enable it in VoiceDesk for natural-language commands.'; question = $Text }
     }
 
     $payload = @{ text = $Text } | ConvertTo-Json -Compress
@@ -267,7 +275,8 @@ $layout = [System.Windows.Forms.TableLayoutPanel]::new()
 $layout.Dock = 'Fill'
 $layout.Padding = [System.Windows.Forms.Padding]::new(20)
 $layout.ColumnCount = 1
-$layout.RowCount = 8
+$layout.RowCount = 9
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('Percent', 100))
@@ -290,6 +299,10 @@ $transcript.Dock = 'Fill'
 $transcript.BorderStyle = 'FixedSingle'
 $transcript.Padding = [System.Windows.Forms.Padding]::new(12)
 $transcript.AutoEllipsis = $true
+$aiToggle = [System.Windows.Forms.CheckBox]::new()
+$aiToggle.Text = 'Enable cloud AI for natural-language and screen questions'
+$aiToggle.AutoSize = $true
+$aiToggle.Checked = $false
 $lastAction = [System.Windows.Forms.Label]::new()
 $lastAction.Text = 'Last action: none'
 $lastAction.AutoSize = $true
@@ -299,7 +312,7 @@ $listenButton.Text = 'Start listening'
 $listenButton.AutoSize = $true
 $listenButton.MinimumSize = [System.Drawing.Size]::new(180, 42)
 $commands = [System.Windows.Forms.Label]::new()
-$commands.Text = 'Exact basic commands work offline. Other requests and screen questions may send text to OpenAI. Screenshots are previewed first; internet access and API charges may apply.'
+$commands.Text = 'With cloud AI off, speech stays on this PC and only exact basic commands run. Enabling AI can send recognized text and requested screen content to OpenAI; API charges may apply.'
 $commands.AutoSize = $true
 $commands.MaximumSize = [System.Drawing.Size]::new(400, 0)
 $cameraStatus = [System.Windows.Forms.Label]::new()
@@ -312,14 +325,15 @@ $gestureButton.MinimumSize = [System.Drawing.Size]::new(180, 38)
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
-$layout.Controls.Add($transcript, 0, 2)
-$layout.Controls.Add($lastAction, 0, 3)
-$layout.Controls.Add($listenButton, 0, 4)
-$layout.Controls.Add($commands, 0, 5)
-$layout.Controls.Add($cameraStatus, 0, 6)
-$layout.Controls.Add($gestureButton, 0, 7)
+$layout.Controls.Add($aiToggle, 0, 2)
+$layout.Controls.Add($transcript, 0, 3)
+$layout.Controls.Add($lastAction, 0, 4)
+$layout.Controls.Add($listenButton, 0, 5)
+$layout.Controls.Add($commands, 0, 6)
+$layout.Controls.Add($cameraStatus, 0, 7)
+$layout.Controls.Add($gestureButton, 0, 8)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false }
+$state = @{ Listening = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
@@ -339,13 +353,14 @@ if (-not $recognizerInfo) {
             if ($state.Listening) { return }
             $state.Listening = $true
             $status.Text = 'Listening…'
-            $hint.Text = 'Listening. Exact commands stay on this PC; other recognized requests are sent to OpenAI.'
+            $hint.Text = if ($state.AiEnabled) { 'Listening. Cloud AI is enabled for non-exact requests and screen questions.' } else { 'Listening locally. Cloud AI is off; only exact basic commands will run.' }
             $listenButton.Text = 'Stop listening'
             $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
         }
         function Stop-VoiceListening {
             if ($state.Listening) { $recognizer.RecognizeAsyncCancel() }
         }
+        $aiToggle.add_CheckedChanged({ $state.AiEnabled = $aiToggle.Checked })
 
         $recognizer.add_SpeechRecognitionRejected({
             $form.BeginInvoke([System.Action] {
