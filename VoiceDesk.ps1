@@ -275,7 +275,7 @@ $layout = [System.Windows.Forms.TableLayoutPanel]::new()
 $layout.Dock = 'Fill'
 $layout.Padding = [System.Windows.Forms.Padding]::new(20)
 $layout.ColumnCount = 1
-$layout.RowCount = 9
+$layout.RowCount = 10
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
@@ -322,6 +322,10 @@ $gestureButton = [System.Windows.Forms.Button]::new()
 $gestureButton.Text = 'Start camera gestures'
 $gestureButton.AutoSize = $true
 $gestureButton.MinimumSize = [System.Drawing.Size]::new(180, 38)
+$stopAllButton = [System.Windows.Forms.Button]::new()
+$stopAllButton.Text = 'Stop all capture'
+$stopAllButton.AutoSize = $true
+$stopAllButton.MinimumSize = [System.Drawing.Size]::new(180, 38)
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -332,8 +336,24 @@ $layout.Controls.Add($listenButton, 0, 5)
 $layout.Controls.Add($commands, 0, 6)
 $layout.Controls.Add($cameraStatus, 0, 7)
 $layout.Controls.Add($gestureButton, 0, 8)
+$layout.Controls.Add($stopAllButton, 0, 9)
 $form.Controls.Add($layout)
 $state = @{ Listening = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
+
+function Stop-AllCapture {
+    $state.GesturePaused = $false
+    if ($state.Listening -and $recognizer) {
+        try { $recognizer.RecognizeAsyncCancel() } catch {}
+    }
+    if ($state.GestureProcess) {
+        try { $state.GestureProcess.Kill() } catch {}
+    }
+    $state.GesturesActive = $false
+    $cameraStatus.Text = 'Camera off'
+    $gestureButton.Text = 'Start camera gestures'
+    $hint.Text = 'Voice and camera capture stopped.'
+}
+$stopAllButton.add_Click({ Stop-AllCapture })
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
@@ -519,7 +539,7 @@ if (-not $recognizerInfo) {
             }
         })
         $form.add_FormClosing({
-            if ($state.GestureProcess) { try { $state.GestureProcess.Kill() } catch {} }
+            Stop-AllCapture
             if ($recognizer) {
                 try { $recognizer.RecognizeAsyncCancel() } catch {}
                 $recognizer.Dispose()
