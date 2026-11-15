@@ -338,7 +338,7 @@ $layout.Controls.Add($cameraStatus, 0, 7)
 $layout.Controls.Add($gestureButton, 0, 8)
 $layout.Controls.Add($stopAllButton, 0, 9)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false; Busy = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
+$state = @{ Listening = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
 
 function Stop-AllCapture {
     $state.GesturePaused = $false
@@ -373,10 +373,28 @@ if (-not $recognizerInfo) {
         function Start-VoiceListening {
             if ($state.Listening) { return }
             $state.Listening = $true
+            $state.RecognitionStopped = $false
             $status.Text = 'Listening…'
             $hint.Text = if ($state.AiEnabled) { 'Listening. Cloud AI is enabled for non-exact requests and screen questions.' } else { 'Listening locally. Cloud AI is off; only exact basic commands will run.' }
             $listenButton.Text = 'Stop listening'
             $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
+        }
+        function Resume-VoiceWhenReady {
+            if ($state.Busy -or -not $state.RecognitionStopped) { return }
+            $state.RecognitionStopped = $false
+            if ($state.ResumeAfterAction) {
+                $state.ResumeAfterAction = $false
+                try { Start-VoiceListening } catch {
+                    $state.Listening = $false
+                    $status.Text = 'Microphone off'
+                    $listenButton.Text = 'Start listening'
+                    $hint.Text = "Could not resume listening: $($_.Exception.Message)"
+                }
+            } else {
+                $status.Text = 'Microphone off'
+                $listenButton.Text = 'Start listening'
+                $hint.Text = 'Press Start listening before speaking.'
+            }
         }
         function Stop-VoiceListening {
             if ($state.Listening) { $recognizer.RecognizeAsyncCancel() }
@@ -402,7 +420,10 @@ if (-not $recognizerInfo) {
             } else {
                 $isStopCommand = $command.Trim().ToLowerInvariant() -eq 'stop listening'
                 $state.ResumeAfterAction = -not $isStopCommand
-                if (-not $isStopCommand) { $state.Busy = $true }
+                if (-not $isStopCommand) {
+                    $state.Busy = $true
+                    $state.RecognitionStopped = $false
+                }
                 $sender.RecognizeAsyncCancel()
                 if (-not $isStopCommand) {
                     $form.BeginInvoke([System.Action] {
@@ -425,19 +446,7 @@ if (-not $recognizerInfo) {
                 $lastAction.Text = "Last action: $result"
                 if ($state.Busy) {
                     $state.Busy = $false
-                    if ($state.ResumeAfterAction) {
-                        $state.ResumeAfterAction = $false
-                        try { Start-VoiceListening } catch {
-                            $state.Listening = $false
-                            $status.Text = 'Microphone off'
-                            $listenButton.Text = 'Start listening'
-                            $hint.Text = "Could not resume listening: $($_.Exception.Message)"
-                        }
-                    } else {
-                        $status.Text = 'Microphone off'
-                        $listenButton.Text = 'Start listening'
-                        $hint.Text = 'Press Start listening before speaking.'
-                    }
+                    Resume-VoiceWhenReady
                 }
             }) | Out-Null
         })
@@ -446,13 +455,20 @@ if (-not $recognizerInfo) {
             $message = if ($eventArgs.Error) { "Recognition error: $($eventArgs.Error.Message)" } else { 'Microphone off' }
             $form.BeginInvoke([System.Action] {
                 $state.Listening = $false
+                $state.RecognitionStopped = $true
                 if ($state.Busy) {
                     $status.Text = 'Processing request…'
                     $listenButton.Text = 'Processing…'
                 } else {
-                    $status.Text = $message
-                    $listenButton.Text = 'Start listening'
-                    $hint.Text = if ($eventArgs.Error) { 'Check microphone access and try again.' } else { 'Press Start listening before speaking.' }
+                    if ($eventArgs.Error) {
+                        $state.ResumeAfterAction = $false
+                        $state.RecognitionStopped = $false
+                        $status.Text = $message
+                        $listenButton.Text = 'Start listening'
+                        $hint.Text = 'Check microphone access and try again.'
+                    } else {
+                        Resume-VoiceWhenReady
+                    }
                 }
             }) | Out-Null
         })
