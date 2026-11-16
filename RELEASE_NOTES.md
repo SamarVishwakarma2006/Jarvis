@@ -1,6 +1,14 @@
-# VoiceDesk 0.1.0 source preview
+# VoiceDesk 0.1.1 source preview
 
 This is an early source release for Windows 10/11. It is not a signed installer. See `README.md` for setup and `PRIVACY.md` for data handling.
+
+## Changes in 0.1.1
+
+- Cloud AI is opt-in and off by default.
+- Added a Stop all capture control and optional local spoken responses.
+- Voice recognition pauses while actions run and avoids overlapping actions.
+- Close-window confirmation stays bound to the named target window.
+- Updated setup and privacy instructions.
 
 ## Included
 
