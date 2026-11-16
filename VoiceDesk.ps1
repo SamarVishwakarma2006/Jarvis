@@ -121,7 +121,7 @@ function Resolve-VoiceIntent {
     }
 
     $payload = @{ text = $Text } | ConvertTo-Json -Compress
-    $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 20
+    $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 35
     $allowed = @('open_notepad','open_calculator','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','unknown')
     if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
         throw 'AI returned an invalid action. No desktop action was run.'
@@ -227,7 +227,7 @@ function Get-ScreenAnswer {
     }
 
     $body = $request | ConvertTo-Json -Depth 4 -Compress
-    $answer = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/screen' -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 45
+    $answer = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/screen' -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 60
     return $answer.answer
 }
 
