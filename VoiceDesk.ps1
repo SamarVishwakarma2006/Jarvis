@@ -275,7 +275,8 @@ $layout = [System.Windows.Forms.TableLayoutPanel]::new()
 $layout.Dock = 'Fill'
 $layout.Padding = [System.Windows.Forms.Padding]::new(20)
 $layout.ColumnCount = 1
-$layout.RowCount = 10
+$layout.RowCount = 11
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
@@ -303,6 +304,10 @@ $aiToggle = [System.Windows.Forms.CheckBox]::new()
 $aiToggle.Text = 'Enable cloud AI for natural-language and screen questions'
 $aiToggle.AutoSize = $true
 $aiToggle.Checked = $false
+$speakToggle = [System.Windows.Forms.CheckBox]::new()
+$speakToggle.Text = 'Speak responses aloud using a local Windows voice'
+$speakToggle.AutoSize = $true
+$speakToggle.Checked = $false
 $lastAction = [System.Windows.Forms.Label]::new()
 $lastAction.Text = 'Last action: none'
 $lastAction.AutoSize = $true
@@ -330,19 +335,24 @@ $stopAllButton.MinimumSize = [System.Drawing.Size]::new(180, 38)
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
 $layout.Controls.Add($aiToggle, 0, 2)
-$layout.Controls.Add($transcript, 0, 3)
-$layout.Controls.Add($lastAction, 0, 4)
-$layout.Controls.Add($listenButton, 0, 5)
-$layout.Controls.Add($commands, 0, 6)
-$layout.Controls.Add($cameraStatus, 0, 7)
-$layout.Controls.Add($gestureButton, 0, 8)
-$layout.Controls.Add($stopAllButton, 0, 9)
+$layout.Controls.Add($speakToggle, 0, 3)
+$layout.Controls.Add($transcript, 0, 4)
+$layout.Controls.Add($lastAction, 0, 5)
+$layout.Controls.Add($listenButton, 0, 6)
+$layout.Controls.Add($commands, 0, 7)
+$layout.Controls.Add($cameraStatus, 0, 8)
+$layout.Controls.Add($gestureButton, 0, 9)
+$layout.Controls.Add($stopAllButton, 0, 10)
 $form.Controls.Add($layout)
 $state = @{ Listening = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
 
 function Stop-AllCapture {
     $state.GesturePaused = $false
     $state.ResumeAfterAction = $false
+    if ($state.Speaking -and $speaker) {
+        try { $speaker.SpeakAsyncCancelAll() } catch {}
+        $state.Speaking = $false
+    }
     if ($state.Listening -and $recognizer) {
         try { $recognizer.RecognizeAsyncCancel() } catch {}
     }
@@ -362,6 +372,7 @@ if (-not $recognizerInfo) {
 } else {
     try {
         $recognizer = [System.Speech.Recognition.SpeechRecognitionEngine]::new($recognizerInfo)
+        $speaker = [System.Speech.Synthesis.SpeechSynthesizer]::new()
         $recognizer.LoadGrammar([System.Speech.Recognition.DictationGrammar]::new())
         try {
             $recognizer.SetInputToDefaultAudioDevice()
@@ -380,7 +391,7 @@ if (-not $recognizerInfo) {
             $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
         }
         function Resume-VoiceWhenReady {
-            if ($state.Busy -or -not $state.RecognitionStopped) { return }
+            if ($state.Busy -or $state.Speaking -or -not $state.RecognitionStopped) { return }
             $state.RecognitionStopped = $false
             if ($state.ResumeAfterAction) {
                 $state.ResumeAfterAction = $false
@@ -446,7 +457,16 @@ if (-not $recognizerInfo) {
                 $lastAction.Text = "Last action: $result"
                 if ($state.Busy) {
                     $state.Busy = $false
-                    Resume-VoiceWhenReady
+                    if ($speakToggle.Checked -and $result -ne 'Listening stopped.') {
+                        $state.Speaking = $true
+                        try { $speaker.SpeakAsync($result) } catch {
+                            $state.Speaking = $false
+                            $lastAction.Text = "Last action: $result (speech output failed)"
+                            Resume-VoiceWhenReady
+                        }
+                    } else {
+                        Resume-VoiceWhenReady
+                    }
                 }
             }) | Out-Null
         })
@@ -472,8 +492,24 @@ if (-not $recognizerInfo) {
                 }
             }) | Out-Null
         })
+        $speaker.add_SpeakCompleted({
+            param($sender, $eventArgs)
+            $form.BeginInvoke([System.Action] {
+                $state.Speaking = $false
+                if ($eventArgs.Error) { $lastAction.Text += ' (speech output failed)' }
+                Resume-VoiceWhenReady
+            }) | Out-Null
+        })
 
         $listenButton.add_Click({
+            if ($state.Speaking) {
+                $state.ResumeAfterAction = $false
+                try { $speaker.SpeakAsyncCancelAll() } catch {}
+                $state.Speaking = $false
+                $hint.Text = 'Speech stopped; voice listening will remain off.'
+                Resume-VoiceWhenReady
+                return
+            }
             if ($state.Busy) {
                 $state.ResumeAfterAction = $false
                 $hint.Text = 'Current request will finish; listening will stay off.'
@@ -600,6 +636,7 @@ if (-not $recognizerInfo) {
                 try { $recognizer.RecognizeAsyncCancel() } catch {}
                 $recognizer.Dispose()
             }
+            if ($speaker) { $speaker.Dispose() }
         })
     } catch {
         $hint.Text = "Voice recognition setup failed: $($_.Exception.Message)"

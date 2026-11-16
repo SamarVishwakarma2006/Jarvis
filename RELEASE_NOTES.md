@@ -7,6 +7,7 @@ This is an early source release for Windows 10/11. It is not a signed installer.
 - Windows voice controls with a fixed local action allowlist.
 - Optional OpenAI intent and screen-question service.
 - Optional local hand gesture preview for pause/resume.
+- Optional local spoken responses using Windows text-to-speech.
 
 ## Requirements and limitations
 
