@@ -75,7 +75,7 @@ Natural-language requests use a small local Node.js service that holds the OpenA
 node .\ai-service\server.mjs
 ```
 
-Start VoiceDesk in another PowerShell window and check **Enable cloud AI** only when you want to send non-exact voice transcripts or screen questions for cloud interpretation. Keep the API key out of source files, command history, screenshots, and Git. Create/manage API keys in your OpenAI API account; API usage is billed separately from a ChatGPT subscription. The local service accepts requests only on `127.0.0.1`. Without it, exact basic commands still work; AI-dependent requests do nothing.
+Start VoiceDesk in another PowerShell window and check **Enable cloud AI** only when you want to send non-exact voice transcripts or screen questions for cloud interpretation. VoiceDesk checks that the local service is running before enabling cloud AI and turns the option back off with a setup hint if it cannot connect. Keep the API key out of source files, command history, screenshots, and Git. Create/manage API keys in your OpenAI API account; API usage is billed separately from a ChatGPT subscription. The local service accepts requests only on `127.0.0.1`. Without it, exact basic commands still work and cloud AI remains unavailable.
 
 ## Scope
 

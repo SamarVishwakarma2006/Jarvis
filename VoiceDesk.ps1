@@ -410,7 +410,19 @@ if (-not $recognizerInfo) {
         function Stop-VoiceListening {
             if ($state.Listening) { $recognizer.RecognizeAsyncCancel() }
         }
-        $aiToggle.add_CheckedChanged({ $state.AiEnabled = $aiToggle.Checked })
+        $aiToggle.add_CheckedChanged({
+            $state.AiEnabled = $aiToggle.Checked
+            if ($state.AiEnabled) {
+                try {
+                    Invoke-RestMethod -Uri 'http://127.0.0.1:43127/health' -Method Get -TimeoutSec 2 | Out-Null
+                    $hint.Text = 'Cloud AI is ready. Non-exact requests and screen questions may be sent to OpenAI.'
+                } catch {
+                    $state.AiEnabled = $false
+                    $aiToggle.Checked = $false
+                    $hint.Text = 'AI service is not running. Start it using the Optional AI intent service steps in README.md.'
+                }
+            }
+        })
 
         $recognizer.add_SpeechRecognitionRejected({
             $form.BeginInvoke([System.Action] {

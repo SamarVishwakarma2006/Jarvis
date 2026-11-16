@@ -52,6 +52,10 @@ async function requestModel(payload, timeoutMs) {
 const server = http.createServer(async (request, response) => {
   response.setHeader('Content-Type', 'application/json');
   response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1');
+  if (request.method === 'GET' && request.url === '/health') {
+    response.writeHead(200).end(JSON.stringify({ ok: true }));
+    return;
+  }
   if (request.method !== 'POST' || !['/intent', '/screen'].includes(request.url)) {
     response.writeHead(404).end(JSON.stringify({ error: 'Not found' }));
     return;
