@@ -350,6 +350,14 @@ $targetStatus.AutoSize = $true
 $targetButton = [System.Windows.Forms.Button]::new()
 $targetButton.Text = 'Choose target window'
 $targetButton.AutoSize = $true
+$pauseGestureToggle = [System.Windows.Forms.CheckBox]::new()
+$pauseGestureToggle.Text = 'Allow fist gesture to pause voice'
+$pauseGestureToggle.AutoSize = $true
+$pauseGestureToggle.Checked = $true
+$resumeGestureToggle = [System.Windows.Forms.CheckBox]::new()
+$resumeGestureToggle.Text = 'Allow open-palm gesture to resume voice'
+$resumeGestureToggle.AutoSize = $true
+$resumeGestureToggle.Checked = $true
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -362,11 +370,15 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
-$layout.RowCount = 13
+$layout.RowCount = 15
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 $layout.Controls.Add($targetStatus, 0, 11)
 $layout.Controls.Add($targetButton, 0, 12)
+$layout.Controls.Add($pauseGestureToggle, 0, 13)
+$layout.Controls.Add($resumeGestureToggle, 0, 14)
 $form.Controls.Add($layout)
 $state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; TargetHandle = [IntPtr]::Zero; TargetTitle = $null }
 
@@ -443,6 +455,10 @@ $targetButton.add_Click({
         $lastAction.Text = "Window picker: $($_.Exception.Message)"
     }
 })
+$pauseGestureToggle.add_CheckedChanged({ $state.GesturePauseEnabled = $pauseGestureToggle.Checked })
+$resumeGestureToggle.add_CheckedChanged({ $state.GestureResumeEnabled = $resumeGestureToggle.Checked })
+$state.GesturePauseEnabled = $pauseGestureToggle.Checked
+$state.GestureResumeEnabled = $resumeGestureToggle.Checked
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
@@ -673,14 +689,14 @@ if (-not $recognizerInfo) {
                                 $gestureButton.Text = 'Stop camera gestures'
                             }
                             'PAUSE_VOICE' {
-                                if ($state.Listening) {
+                                if ($state.GesturePauseEnabled -and $state.Listening) {
                                     $state.GesturePaused = $true
                                     Stop-VoiceListening
                                     $hint.Text = 'Gesture paused voice listening. Show an open palm to resume.'
                                 }
                             }
                             'RESUME_VOICE' {
-                                if ($state.GesturePaused) {
+                                if ($state.GestureResumeEnabled -and $state.GesturePaused) {
                                     $state.GesturePaused = $false
                                     try { Start-VoiceListening } catch { $hint.Text = "Gesture could not resume voice: $($_.Exception.Message)" }
                                 }
