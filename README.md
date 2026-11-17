@@ -71,7 +71,7 @@ Close VoiceDesk and delete the extracted `VoiceDesk` folder. If you created `.ve
 
 ## Optional AI intent service
 
-Natural-language requests use a small local Node.js service that holds the OpenAI API key outside VoiceDesk and the repository. Install Node.js and set `OPENAI_API_KEY` and `VOICEDESK_MODEL` in your Windows user environment. Then double-click `Start-AI-Service.cmd` (or run `node .\ai-service\server.mjs` in PowerShell). The launcher checks that Node.js and both settings exist before it starts:
+Natural-language requests use a small local Node.js service that holds the OpenAI API key outside VoiceDesk and the repository. Install Node.js 18 or newer and set `OPENAI_API_KEY` and `VOICEDESK_MODEL` in your Windows user environment. Then double-click `Start-AI-Service.cmd` (or run `node .\ai-service\server.mjs` in PowerShell). The launcher checks that Node.js and both settings exist before it starts:
 
 ```powershell
 Start-AI-Service.cmd

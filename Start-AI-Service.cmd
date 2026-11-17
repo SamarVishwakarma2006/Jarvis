@@ -6,6 +6,12 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+for /f "tokens=1 delims=." %%v in ('node -p "process.versions.node"') do set "NODE_MAJOR=%%v"
+if %NODE_MAJOR% LSS 18 (
+    echo VoiceDesk requires Node.js 18 or newer. Update Node.js, then open a new terminal.
+    pause
+    exit /b 1
+)
 if not defined OPENAI_API_KEY (
     echo OPENAI_API_KEY is missing. Set it in your Windows user environment variables.
     pause
