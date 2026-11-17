@@ -52,6 +52,11 @@ async function requestModel(payload, timeoutMs) {
 const server = http.createServer(async (request, response) => {
   response.setHeader('Content-Type', 'application/json');
   response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1');
+  const origin = request.headers.origin;
+  if (origin && origin !== 'http://127.0.0.1') {
+    response.writeHead(403).end(JSON.stringify({ error: 'Requests from this origin are not allowed.' }));
+    return;
+  }
   if (request.method === 'GET' && request.url === '/health') {
     response.writeHead(200).end(JSON.stringify({ ok: true }));
     return;
