@@ -5,7 +5,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'VERSION must use the format m
 
 $files = @(
     'README.md', 'LICENSE', 'PRIVACY.md', 'RELEASE_NOTES.md', 'VERSION',
-    'Run-VoiceDesk.cmd', 'VoiceDesk.ps1', 'package-release.ps1',
+    'Run-VoiceDesk.cmd', 'Start-AI-Service.cmd', 'VoiceDesk.ps1', 'package-release.ps1',
     'ai-service', 'gesture_service.py', 'requirements-gestures.txt'
 )
 foreach ($file in $files) {

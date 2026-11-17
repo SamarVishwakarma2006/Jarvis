@@ -69,13 +69,13 @@ Close VoiceDesk and delete the extracted `VoiceDesk` folder. If you created `.ve
 
 ## Optional AI intent service
 
-Natural-language requests use a small local Node.js service that holds the OpenAI API key outside VoiceDesk and the repository. Install Node.js, set `OPENAI_API_KEY` and `VOICEDESK_MODEL` in your Windows user environment, then start the service in one PowerShell window:
+Natural-language requests use a small local Node.js service that holds the OpenAI API key outside VoiceDesk and the repository. Install Node.js and set `OPENAI_API_KEY` and `VOICEDESK_MODEL` in your Windows user environment. Then double-click `Start-AI-Service.cmd` (or run `node .\ai-service\server.mjs` in PowerShell). The launcher checks that Node.js and both settings exist before it starts:
 
 ```powershell
-node .\ai-service\server.mjs
+Start-AI-Service.cmd
 ```
 
-Start VoiceDesk in another PowerShell window and check **Enable cloud AI** only when you want to send non-exact voice transcripts or screen questions for cloud interpretation. VoiceDesk checks that the local service is running before enabling cloud AI and turns the option back off with a setup hint if it cannot connect. Keep the API key out of source files, command history, screenshots, and Git. Create/manage API keys in your OpenAI API account; API usage is billed separately from a ChatGPT subscription. The local service accepts requests only on `127.0.0.1`. Without it, exact basic commands still work and cloud AI remains unavailable.
+Start VoiceDesk and check **Enable cloud AI** only when you want to send non-exact voice transcripts or screen questions for cloud interpretation. VoiceDesk checks that the local service is running before enabling cloud AI and turns the option back off with a setup hint if it cannot connect. Keep the API key out of source files, command history, screenshots, and Git. Create/manage API keys in your OpenAI API account; API usage is billed separately from a ChatGPT subscription. The local service accepts requests only on `127.0.0.1`. Without it, exact basic commands still work and cloud AI remains unavailable.
 
 ## Scope
 
