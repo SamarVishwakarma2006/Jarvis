@@ -4,7 +4,7 @@ $version = (Get-Content (Join-Path $root 'VERSION') -Raw).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'VERSION must use the format major.minor.patch.' }
 
 $files = @(
-    'README.md', 'LICENSE', 'PRIVACY.md', 'RELEASE_NOTES.md', 'VERSION',
+    'README.md', 'LICENSE', 'PRIVACY.md', 'RELEASE_NOTES.md', 'WINDOWS-ACCEPTANCE.md', 'VERSION',
     'Run-VoiceDesk.cmd', 'Start-AI-Service.cmd', 'VoiceDesk.ps1', 'package-release.ps1',
     'ai-service', 'gesture_service.py', 'requirements-gestures.txt'
 )
