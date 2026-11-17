@@ -237,8 +237,19 @@ function Invoke-IntentFromVoice {
     if ($Intent.intent -eq 'unknown') { return $Intent.reply }
     if ($Intent.intent -eq 'screen_question') { return Get-ScreenAnswer -Question $Intent.question }
     $target = $null
+    if ($Intent.intent -in @('minimize_window', 'maximize_window', 'close_window')) {
+        if ($state.TargetHandle -ne [IntPtr]::Zero) {
+            $target = Get-ActiveTarget -Handle $state.TargetHandle
+            if ($target.Title -ne $state.TargetTitle) {
+                $state.TargetHandle = [IntPtr]::Zero
+                $state.TargetTitle = $null
+                throw 'The selected window changed or closed. Choose a target window again.'
+            }
+        } else {
+            $target = Get-ActiveTarget
+        }
+    }
     if ($Intent.intent -eq 'close_window') {
-        $target = Get-ActiveTarget
         $confirmation = @{ Approved = $false }
         $form.Invoke([System.Action] {
             $answer = [System.Windows.Forms.MessageBox]::Show(
@@ -274,6 +285,7 @@ $form.Font = [System.Drawing.Font]::new('Segoe UI', 10)
 
 $layout = [System.Windows.Forms.TableLayoutPanel]::new()
 $layout.Dock = 'Fill'
+$layout.AutoScroll = $true
 $layout.Padding = [System.Windows.Forms.Padding]::new(20)
 $layout.ColumnCount = 1
 $layout.RowCount = 11
@@ -332,6 +344,12 @@ $stopAllButton = [System.Windows.Forms.Button]::new()
 $stopAllButton.Text = 'Stop all capture'
 $stopAllButton.AutoSize = $true
 $stopAllButton.MinimumSize = [System.Drawing.Size]::new(180, 38)
+$targetStatus = [System.Windows.Forms.Label]::new()
+$targetStatus.Text = 'Window target: foreground window'
+$targetStatus.AutoSize = $true
+$targetButton = [System.Windows.Forms.Button]::new()
+$targetButton.Text = 'Choose target window'
+$targetButton.AutoSize = $true
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -344,8 +362,13 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
+$layout.RowCount = 13
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+[void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+$layout.Controls.Add($targetStatus, 0, 11)
+$layout.Controls.Add($targetButton, 0, 12)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
+$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; TargetHandle = [IntPtr]::Zero; TargetTitle = $null }
 
 function Stop-AllCapture {
     $state.GesturePaused = $false
@@ -366,6 +389,60 @@ function Stop-AllCapture {
     $hint.Text = 'Voice and camera capture stopped.'
 }
 $stopAllButton.add_Click({ Stop-AllCapture })
+
+$targetButton.add_Click({
+    try {
+        $root = [System.Windows.Automation.AutomationElement]::RootElement
+        $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+        $choices = [System.Collections.Generic.List[object]]::new()
+        $choices.Add([pscustomobject]@{ Title = 'Foreground window (default)'; Handle = [IntPtr]::Zero })
+        for ($index = 0; $index -lt $windows.Count; $index++) {
+            try {
+                $element = $windows.Item($index)
+                $title = $element.Current.Name
+                $handle = [IntPtr]$element.Current.NativeWindowHandle
+                if ($handle -ne [IntPtr]::Zero -and $handle -ne $form.Handle -and -not [string]::IsNullOrWhiteSpace($title) -and -not $element.Current.IsOffscreen) {
+                    $choices.Add([pscustomobject]@{ Title = $title; Handle = $handle })
+                }
+            } catch { }
+        }
+        if ($choices.Count -eq 0) { throw 'No visible windows were found.' }
+
+        $picker = [System.Windows.Forms.Form]::new()
+        $picker.Text = 'Choose a window target'
+        $picker.StartPosition = 'CenterParent'
+        $picker.Size = [System.Drawing.Size]::new(480, 360)
+        $list = [System.Windows.Forms.ListBox]::new()
+        $list.Dock = 'Fill'
+        $list.DisplayMember = 'Title'
+        foreach ($choice in $choices) { [void]$list.Items.Add($choice) }
+        $buttons = [System.Windows.Forms.FlowLayoutPanel]::new()
+        $buttons.Dock = 'Bottom'
+        $buttons.Height = 48
+        $select = [System.Windows.Forms.Button]::new()
+        $select.Text = 'Use selected window'
+        $select.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $cancel = [System.Windows.Forms.Button]::new()
+        $cancel.Text = 'Cancel'
+        $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+        $buttons.Controls.Add($select)
+        $buttons.Controls.Add($cancel)
+        $picker.Controls.Add($list)
+        $picker.Controls.Add($buttons)
+        $picker.AcceptButton = $select
+        $picker.CancelButton = $cancel
+        try {
+            if ($choices.Count -gt 0) { $list.SelectedIndex = 0 }
+            if ($picker.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK -and $list.SelectedItem) {
+                $state.TargetHandle = $list.SelectedItem.Handle
+                $state.TargetTitle = $list.SelectedItem.Title
+                $targetStatus.Text = if ($state.TargetHandle -eq [IntPtr]::Zero) { 'Window target: foreground window' } else { "Window target: $($state.TargetTitle)" }
+            }
+        } finally { $picker.Dispose() }
+    } catch {
+        $lastAction.Text = "Window picker: $($_.Exception.Message)"
+    }
+})
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
