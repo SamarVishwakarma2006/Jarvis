@@ -344,7 +344,7 @@ $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
+$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false }
 
 function Stop-AllCapture {
     $state.GesturePaused = $false
@@ -376,13 +376,21 @@ if (-not $recognizerInfo) {
         $recognizer.LoadGrammar([System.Speech.Recognition.DictationGrammar]::new())
         try {
             $recognizer.SetInputToDefaultAudioDevice()
+            $state.MicrophoneReady = $true
         } catch {
             $hint.Text = "Microphone unavailable. Connect or enable one and check Windows microphone privacy settings. $($_.Exception.Message)"
-            $listenButton.Enabled = $false
         }
 
         function Start-VoiceListening {
             if ($state.Listening) { return }
+            if (-not $state.MicrophoneReady) {
+                try {
+                    $recognizer.SetInputToDefaultAudioDevice()
+                    $state.MicrophoneReady = $true
+                } catch {
+                    throw "Microphone unavailable. Connect or enable one, check Windows microphone privacy settings, then retry. $($_.Exception.Message)"
+                }
+            }
             $state.Listening = $true
             $state.RecognitionStopped = $false
             $status.Text = 'Listening…'
@@ -493,6 +501,7 @@ if (-not $recognizerInfo) {
                     $listenButton.Text = 'Processing…'
                 } else {
                     if ($eventArgs.Error) {
+                        $state.MicrophoneReady = $false
                         $state.ResumeAfterAction = $false
                         $state.RecognitionStopped = $false
                         $status.Text = $message
