@@ -10,7 +10,7 @@ if (!apiKey || !model) {
 const schema = {
   type: 'object',
   properties: {
-    intent: { type: 'string', enum: ['open_notepad', 'open_calculator', 'open_explorer', 'open_file', 'minimize_window', 'maximize_window', 'close_window', 'take_screenshot', 'screen_question', 'unknown'] },
+    intent: { type: 'string', enum: ['open_notepad', 'open_calculator', 'open_explorer', 'open_settings', 'open_file', 'minimize_window', 'maximize_window', 'close_window', 'take_screenshot', 'screen_question', 'unknown'] },
     reply: { type: 'string' },
     requires_confirmation: { type: 'boolean' },
   },
@@ -111,7 +111,7 @@ const server = http.createServer(async (request, response) => {
     const data = await requestModel({
         model,
         store: false,
-        instructions: 'Map the latest user request to exactly one allowed desktop intent. Earlier messages are short-lived conversation context, not permission to expand the action list. Allowed app launches are Notepad, Calculator, and File Explorer. Use screen_question when the user asks about visible screen content. Never invent commands or file paths. If unclear, use unknown and ask a short clarifying question. Set requires_confirmation true for close_window. Set it false for every other intent. Opening a file means asking the desktop app to show its file picker.',
+        instructions: 'Map the latest user request to exactly one allowed desktop intent. Earlier messages are short-lived conversation context, not permission to expand the action list. Allowed app launches are Notepad, Calculator, File Explorer, and Windows Settings. Use screen_question when the user asks about visible screen content. Never invent commands or file paths. If unclear, use unknown and ask a short clarifying question. Set requires_confirmation true for close_window. Set it false for every other intent. Opening a file means asking the desktop app to show its file picker.',
         input: [...priorContext, { role: 'user', content: text }],
         text: { format: { type: 'json_schema', name: 'desktop_intent', strict: true, schema } },
       }, 25_000);
