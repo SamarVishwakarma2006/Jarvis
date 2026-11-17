@@ -36,6 +36,7 @@ Say one of these commands:
 
 - “Open Notepad”
 - “Open Calculator”
+- “Open File Explorer”
 - “Open file” (opens a picker for common document and image formats)
 - “What is on my screen?” (asks AI about the active window)
 - “Minimize window”

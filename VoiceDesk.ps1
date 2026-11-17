@@ -35,13 +35,14 @@ function Get-ActiveTarget {
 
 function Invoke-DesktopAction {
     param(
-        [Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','OpenFile','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name,
+        [Parameter(Mandatory)][ValidateSet('OpenNotepad','OpenCalculator','OpenExplorer','OpenFile','MinimizeWindow','MaximizeWindow','CloseWindow','TakeScreenshot')][string]$Name,
         [IntPtr]$TargetHandle = [IntPtr]::Zero
     )
 
     switch ($Name) {
         'OpenNotepad' { Start-Process notepad; return 'Opened Notepad.' }
         'OpenCalculator' { Start-Process calc; return 'Opened Calculator.' }
+        'OpenExplorer' { Start-Process explorer.exe; return 'Opened File Explorer.' }
         'OpenFile' {
             $selection = @{ Path = $null }
             $form.Invoke([System.Action] {
@@ -102,7 +103,7 @@ function Invoke-DesktopAction {
 function Resolve-VoiceIntent {
     param([Parameter(Mandatory)][string]$Text)
     $localIntents = @{
-        'open notepad' = 'open_notepad'; 'open calculator' = 'open_calculator'; 'open file' = 'open_file'
+        'open notepad' = 'open_notepad'; 'open calculator' = 'open_calculator'; 'open file explorer' = 'open_explorer'; 'open file' = 'open_file'
         'minimize window' = 'minimize_window'; 'maximize window' = 'maximize_window'
         'close window' = 'close_window'; 'take screenshot' = 'take_screenshot'
         'what is on my screen' = 'screen_question'; 'what is on the screen' = 'screen_question'
@@ -122,7 +123,7 @@ function Resolve-VoiceIntent {
 
     $payload = @{ text = $Text } | ConvertTo-Json -Compress
     $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 35
-    $allowed = @('open_notepad','open_calculator','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','unknown')
+    $allowed = @('open_notepad','open_calculator','open_explorer','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','unknown')
     if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
         throw 'AI returned an invalid action. No desktop action was run.'
     }
@@ -249,7 +250,7 @@ function Invoke-IntentFromVoice {
         if (-not $confirmation.Approved) { return 'Cancelled. The window was not closed.' }
     }
     $actionName = @{
-        open_notepad = 'OpenNotepad'; open_calculator = 'OpenCalculator'; open_file = 'OpenFile'
+        open_notepad = 'OpenNotepad'; open_calculator = 'OpenCalculator'; open_explorer = 'OpenExplorer'; open_file = 'OpenFile'
         minimize_window = 'MinimizeWindow'; maximize_window = 'MaximizeWindow'; close_window = 'CloseWindow'
         take_screenshot = 'TakeScreenshot'
     }[$Intent.intent]
