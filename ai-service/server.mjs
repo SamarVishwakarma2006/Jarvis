@@ -62,11 +62,18 @@ const server = http.createServer(async (request, response) => {
   }
 
   try {
-    let body = '';
+    const chunks = [];
+    let bodyBytes = 0;
     for await (const chunk of request) {
-      body += chunk;
-      if (body.length > 12_000_000) throw new Error('Request is too large.');
+      bodyBytes += chunk.length;
+      if (bodyBytes > 12_000_000) {
+        const error = new Error('Request is too large.');
+        error.statusCode = 413;
+        throw error;
+      }
+      chunks.push(chunk);
     }
+    const body = Buffer.concat(chunks, bodyBytes).toString('utf8');
     const { text, screenText, image } = JSON.parse(body);
     if (typeof text !== 'string' || !text.trim() || text.length > 1000) {
       response.writeHead(400).end(JSON.stringify({ error: 'Provide a non-empty transcript under 1000 characters.' }));
