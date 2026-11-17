@@ -1,230 +1,221 @@
-# VoiceDesk roadmap
+# VoiceDesk GitHub build plan
 
-Build a dependable Windows voice assistant in small, reviewable releases. The target is a useful desktop assistant with a Jarvis-like conversational feel, not an unrestricted agent.
+VoiceDesk is a Windows voice-control prototype with a small allowlist, optional cloud AI, screen questions with screenshot approval, and optional local camera gestures. Use the steps below as GitHub Issues and complete them in order. Keep every change on `master`; do not create branches.
 
-## How to track the work on GitHub
+## Track each step on GitHub
 
-Create one GitHub Issue for each numbered step. Copy its checklist into the issue, label it `enhancement`, and close it with the step's commit or pull request. Do every step directly on `master`, as requested. Commit and push each completed step so GitHub records progress.
+For each step:
 
-The repository's GitHub remote is named `origin`. Replace `<issue-number>` in commit messages with the issue created for that step. Before starting a step, sync the same `master` branch:
+1. Create a GitHub Issue with the title and checklist below; label it `enhancement` (or `bug` if investigating a failure).
+2. Start from the latest `master`:
 
-```powershell
-git switch master
-git pull --ff-only origin master
-```
+   ```powershell
+   git switch master
+   git pull --ff-only origin master
+   ```
 
-After pushing a step, repeat those two commands before starting the next one. If your default branch is named `main`, substitute `main` for `master` throughout.
+3. Complete only that issue, run its listed checks, and commit with the issue number in the message.
+4. Push the commit, then close the issue on GitHub.
 
-## Step 1 — Make the voice prototype dependable
+Replace `<issue-number>` in each commit command with the number GitHub assigned. Push after each step with `git push origin master`. If Git says the branch is behind, pull with `--ff-only` before pushing; do not force-push.
 
-**Goal:** Make the current fixed-command prototype report microphone/recognizer errors clearly, show what it heard, and stop cleanly. Keep the existing small command allowlist.
+## Already in the prototype
+
+- Windows desktop UI with explicit start/stop controls, transcript, status, and action result.
+- Local exact voice commands; speech audio is not sent to the AI service.
+- Bounded desktop actions, a file picker, and confirmation before closing a window.
+- Optional structured AI intents and screen questions; cloud AI starts off.
+- Screenshot preview and explicit send/cancel choice for screen questions.
+- Optional local text-to-speech and camera gestures, with visible controls.
+- Local AI service request limits, timeouts, readiness check, UTF-8 parsing, and origin filtering.
+- Source ZIP packaging and setup/privacy/removal documentation.
+
+The source preview still needs hands-on verification on the target Windows setup before it should be called a stable public release. The feature list below is a plan, not a claim that those checks have passed.
+
+## Step 1 — Verify the current Windows build
+
+**GitHub Issue title:** `Verify VoiceDesk on the target Windows setup`
+
+**Goal:** Run the app on the Windows machine it is meant to support, record failures, and fix the ones that block normal use.
 
 **Done when:**
 
-- Startup explains how to fix a missing microphone or speech recognizer.
-- The recognized phrase and action result are visible.
-- “Stop listening” and Ctrl+C both exit cleanly.
-- Commands that are not in the allowlist cannot trigger an action.
-- The README matches the commands that actually work.
+- Voice starts only after the user presses **Start listening** and stops from the UI or by closing the app.
+- Missing microphone or speech recognizer produces a useful message.
+- Exact commands, file picker, minimize/maximize, and confirmed close behave as documented.
+- Cloud AI works when configured and enabled; it stays off otherwise.
+- Screen questions show accessible text behavior and screenshot preview/cancel/send behavior.
+- Camera gestures start and stop visibly; gesture failure does not break voice controls.
+- Known limitations and actual results are recorded in `RELEASE_NOTES.md`.
 
-Before work:
+**Check:** Follow the checklist manually on the target Windows version. Do not describe hardware-dependent behavior as verified until it has been tried.
 
 ```powershell
-git switch master
-git pull --ff-only origin master
+git add VoiceDesk.ps1 gesture_service.py README.md RELEASE_NOTES.md
+git commit -m "Verify VoiceDesk on Windows (Closes #<issue-number>)"
+git push origin master
 ```
 
-After work:
+## Step 2 — Make AI service setup easier
+
+**GitHub Issue title:** `Add a guided launcher for optional cloud AI`
+
+**Goal:** Help users start the local Node service and diagnose missing Node.js, API key, or model configuration without putting secrets in the repository.
+
+**Done when:**
+
+- A launcher checks for Node.js and required environment variables before starting the service.
+- Missing configuration prints clear setup instructions and exits with a useful status.
+- Closing the service window stops the local service.
+- README setup and troubleshooting instructions match the launcher.
+- No API key is written into tracked files, command-line arguments, logs, or the ZIP.
+
+```powershell
+git add Start-AI-Service.cmd package-release.ps1 README.md
+git commit -m "Add guided AI service startup (Closes #<issue-number>)"
+git push origin master
+```
+
+## Step 3 — Improve microphone recovery
+
+**GitHub Issue title:** `Recover from microphone availability changes`
+
+**Goal:** Let a user recover if the microphone is disconnected, disabled, or unavailable after VoiceDesk starts.
+
+**Done when:**
+
+- The UI explains the microphone error and offers a retry after the device is fixed.
+- Retry does not create duplicate recognizers or event handlers.
+- Stop and window-close still release capture cleanly.
+- The local command flow works after recovery.
 
 ```powershell
 git add VoiceDesk.ps1 README.md
-git commit -m "Improve voice command reliability (Closes #<issue-number>)"
+git commit -m "Add microphone recovery (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 2 — Add a real desktop interface
+## Step 4 — Add a few approved app launches
 
-**Goal:** Replace the console-only experience with a small Windows app showing listening state, transcript, last action, and a large stop control. Keep push-to-talk or an obvious listening toggle; do not silently listen on startup.
+**GitHub Issue title:** `Add safe app launching by name`
+
+**Goal:** Extend the fixed action allowlist with a small set of useful Windows apps; never turn voice text into a process path or shell command.
 
 **Done when:**
 
-- The app starts and stops listening from its UI.
-- The user can see when the microphone is active and what was recognized.
-- Microphone permission/device failures are visible and recoverable.
-- Closing the UI stops microphone capture.
-
-Before work:
+- Each supported app has an explicit name-to-launch mapping in local code.
+- Unknown app names produce a clear response and launch nothing.
+- Natural-language AI can select only the same fixed app intents.
+- README lists the supported launch phrases.
 
 ```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
-
-```powershell
-git add -A
-git commit -m "Add a Windows desktop interface (Closes #<issue-number>)"
+git add VoiceDesk.ps1 ai-service/server.mjs README.md
+git commit -m "Add approved app launch commands (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 3 — Make desktop actions reliable and bounded
+## Step 5 — Make target window selection clearer
 
-**Goal:** Replace broad keyboard shortcuts with named, typed actions. Use Windows UI Automation to inspect and invoke controls when an app exposes them; keep keyboard shortcuts as an explicit fallback.
+**GitHub Issue title:** `Let users choose the target window`
+
+**Goal:** Reduce mistakes when a window action should affect a window other than the current foreground window.
 
 **Done when:**
 
-- Each action is a named operation with validated inputs and a result or error.
-- The app identifies the target window before acting and reports the target to the user.
-- Unsupported UI controls fail visibly instead of claiming success.
-- The model or speech recognizer cannot supply executable shell or script text.
-
-Before work:
+- The user can see available windows and select a target for a supported window action.
+- The selected target is shown before a close confirmation and remains the target acted on.
+- If the target closes or becomes unavailable, the action fails visibly without switching to another window.
+- Current foreground behavior remains available as the simple default.
 
 ```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
-
-```powershell
-git add -A
-git commit -m "Add safe Windows UI automation actions (Closes #<issue-number>)"
+git add VoiceDesk.ps1 README.md
+git commit -m "Add explicit window target selection (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 4 — Open apps and files safely
+## Step 6 — Improve gesture controls
 
-**Goal:** Add useful app launching and file opening without guessing dangerous paths. Start with an app allowlist and the Windows file picker; add voice selection only after the user can confirm the chosen file.
+**GitHub Issue title:** `Add configurable camera gesture behavior`
+
+**Goal:** Make optional camera gestures easier to use across different cameras and users while keeping them limited to low-risk controls.
 
 **Done when:**
 
-- The user can launch approved apps by name.
-- File opening uses a picker or a confirmed, validated path.
-- Missing files and unsupported apps produce helpful errors.
-- No voice input is passed to PowerShell, Command Prompt, or an unrestricted process launcher.
-
-Before work:
-
-```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
+- Camera access stays off until explicitly started and has an obvious stop control.
+- Pause/resume gestures are debounced and can be individually enabled or disabled.
+- Gesture confidence or loss of hand tracking does not trigger repeated actions.
+- Gestures cannot close windows, open files, send content, or shut down the PC.
+- README describes camera permission, supported gestures, and limitations.
 
 ```powershell
-git add -A
-git commit -m "Add safe app and file opening (Closes #<issue-number>)"
+git add VoiceDesk.ps1 gesture_service.py README.md PRIVACY.md
+git commit -m "Improve optional gesture controls (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 5 — Add AI intent understanding
+## Step 7 — Add short-lived conversational context
 
-**Goal:** Let the user say requests naturally, then have AI convert them into a proposed structured action such as `{ action: "open_file", path: ... }`. The app validates the proposal and calls only its own allowlisted tools.
+**GitHub Issue title:** `Add opt-in session context for follow-up requests`
+
+**Goal:** Support short follow-up phrases such as “what about the next window?” without keeping a permanent transcript or executing unrestricted model output.
 
 **Done when:**
 
-- AI output is structured and validated before execution.
-- Unknown or ambiguous requests trigger a clarifying question.
-- Low-risk actions can run directly; closing windows, overwriting/deleting, sending, and shutdown require explicit confirmation.
-- API credentials are not committed or embedded in a distributed client. Cloud use is clearly disclosed; a local-only mode remains available for basic commands.
-- The assistant reports what it did and whether it succeeded.
-
-Before work:
+- Context is limited to the current app session and has a visible clear/reset action.
+- Context is off by default or clearly enabled by the user before any text is retained.
+- Sensitive screen content is not silently added to conversation history.
+- AI still returns a validated allowlisted intent; ambiguous or high-impact requests ask the user before acting.
+- Privacy documentation states what is retained and when it is cleared.
 
 ```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
-
-```powershell
-git add -A
-git commit -m "Add validated AI intent handling (Closes #<issue-number>)"
+git add VoiceDesk.ps1 ai-service/server.mjs README.md PRIVACY.md
+git commit -m "Add controlled session context (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 6 — Let the assistant understand the screen
+## Step 8 — Add optional wake-word mode
 
-**Goal:** Answer questions about the current screen using accessibility/UI Automation data first, with an explicit screenshot capture as a fallback for inaccessible apps.
+**GitHub Issue title:** `Prototype opt-in local wake-word listening`
+
+**Goal:** Explore hands-free activation only after the explicit start/stop experience is reliable. Prefer local wake-word detection and keep it off by default.
 
 **Done when:**
 
-- Screen reading happens only after a clear user request or an enabled, visible setting.
-- The user can preview or cancel a screenshot before it is sent to a cloud model.
-- Sensitive text is not stored in logs by default.
-- The assistant states when it cannot reliably identify a control or screen detail.
-
-Before work:
-
-```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
+- Wake-word mode requires explicit opt-in and has a persistent visible listening indicator and stop control.
+- Wake-word detection runs locally; raw audio is not sent to cloud services for wake-word detection.
+- Normal push-to-talk/toggle mode remains available.
+- The feature documents battery/CPU, privacy, language, and false-trigger limitations.
+- If reliable local detection cannot be achieved with supported dependencies, document the result and leave the feature out.
 
 ```powershell
-git add -A
-git commit -m "Add user-controlled screen awareness (Closes #<issue-number>)"
+git add VoiceDesk.ps1 gesture_service.py README.md PRIVACY.md package-release.ps1 requirements-wakeword.txt
+git commit -m "Prototype local wake word mode (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 7 — Add optional camera gestures
+## Step 9 — Prepare a stable public release
 
-**Goal:** Add a few configurable gestures for simple actions, such as pause/resume or dismiss. Gestures should complement voice, not become a requirement.
+**GitHub Issue title:** `Prepare VoiceDesk 1.0 release`
+
+**Goal:** Turn the verified source preview into a release someone else can install, understand, and remove.
 
 **Done when:**
 
-- Camera activation is explicit and visibly indicated.
-- The user can disable gestures and stop camera capture at any time.
-- Gestures are debounced so one held pose does not repeat an action.
-- Gestures cannot trigger high-impact actions such as shutdown, deletion, or sending.
-
-Before work:
-
-```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
+- Step 1 acceptance checks pass on a clean supported Windows setup.
+- Version, release notes, requirements, privacy details, and removal steps agree.
+- The source ZIP contains only the intended release files and extracts into a clear folder.
+- GitHub Release notes include setup, known limitations, and rollback/removal guidance.
+- Any installer or signing work is included only if the source ZIP workflow proves insufficient.
 
 ```powershell
-git add -A
-git commit -m "Add optional camera gestures (Closes #<issue-number>)"
+git add VERSION RELEASE_NOTES.md README.md PRIVACY.md package-release.ps1
+git commit -m "Prepare VoiceDesk release (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 8 — Package and publish a usable release
+## Keep out of scope until the safety model supports it
 
-**Goal:** Make installation, first-run setup, privacy behavior, and supported Windows versions clear enough for someone else to try the app.
-
-**Done when:**
-
-- A clean Windows machine can install and launch the release using documented steps.
-- First run asks for microphone/camera access only when needed.
-- The app has visible listening/camera indicators, a global stop control, and a concise privacy page.
-- GitHub Releases include version notes, known limitations, and removal instructions.
-
-Before work:
-
-```powershell
-git switch master
-git pull --ff-only origin master
-```
-
-After work:
-
-```powershell
-git add -A
-git commit -m "Prepare the first public release (Closes #<issue-number>)"
-git push origin master
-```
-
-## Design rule for every step
-
-AI may interpret and propose. The local app owns permissions, validation, confirmations, and execution. Never execute model-generated shell commands. Keep microphone, screen, and camera access visible and under user control.
+- Never execute AI-generated shell, PowerShell, or arbitrary file paths.
+- Do not add shutdown, deletion, purchases, sending messages, or other high-impact actions without a separate permission and confirmation design.
+- Do not add always-on cloud audio or store screen captures/transcripts by default.
+- Treat wake-word and richer memory as optional experiments, not requirements for the core app.
