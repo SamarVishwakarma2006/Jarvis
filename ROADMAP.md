@@ -1,6 +1,6 @@
 # VoiceDesk GitHub build plan
 
-VoiceDesk is a Windows voice-control prototype with a small allowlist, optional cloud AI, screen questions with screenshot approval, and optional local camera gestures. Use the steps below as GitHub Issues and complete them in order. Keep every change on `master`; do not create branches.
+VoiceDesk is a Windows voice-control prototype with a small allowlist, optional cloud AI, screen questions with screenshot approval, and optional local camera gestures. Steps 2–7 have been implemented on `master`. Step 1 still needs a hands-on Windows run; Step 8 is deferred; Step 9 is prepared as a source preview but must not be called a verified release until Step 1 passes. Keep every change on `master`; do not create branches.
 
 ## Track each step on GitHub
 
@@ -58,6 +58,8 @@ git push origin master
 
 ## Step 2 — Make AI service setup easier
 
+**Status:** Implemented in commit `9842356`.
+
 **GitHub Issue title:** `Add a guided launcher for optional cloud AI`
 
 **Goal:** Help users start the local Node service and diagnose missing Node.js, API key, or model configuration without putting secrets in the repository.
@@ -78,6 +80,8 @@ git push origin master
 
 ## Step 3 — Improve microphone recovery
 
+**Status:** Implemented in commit `8d5d5a7`.
+
 **GitHub Issue title:** `Recover from microphone availability changes`
 
 **Goal:** Let a user recover if the microphone is disconnected, disabled, or unavailable after VoiceDesk starts.
@@ -96,6 +100,8 @@ git push origin master
 ```
 
 ## Step 4 — Add a few approved app launches
+
+**Status:** Implemented in commits `9415538` and `e9cb49f` (File Explorer and Windows Settings).
 
 **GitHub Issue title:** `Add safe app launching by name`
 
@@ -116,6 +122,8 @@ git push origin master
 
 ## Step 5 — Make target window selection clearer
 
+**Status:** Implemented in commit `76d612c`.
+
 **GitHub Issue title:** `Let users choose the target window`
 
 **Goal:** Reduce mistakes when a window action should affect a window other than the current foreground window.
@@ -134,6 +142,8 @@ git push origin master
 ```
 
 ## Step 6 — Improve gesture controls
+
+**Status:** Implemented in commit `ec27756`.
 
 **GitHub Issue title:** `Add configurable camera gesture behavior`
 
@@ -154,6 +164,8 @@ git push origin master
 ```
 
 ## Step 7 — Add short-lived conversational context
+
+**Status:** Implemented in commit `5a9c31b`.
 
 **GitHub Issue title:** `Add opt-in session context for follow-up requests`
 
@@ -179,6 +191,8 @@ git push origin master
 
 **Goal:** Explore hands-free activation only after the explicit start/stop experience is reliable. Prefer local wake-word detection and keep it off by default.
 
+**Current decision:** Deferred. The official [openWakeWord project](https://github.com/dscripka/openWakeWord) documents Windows inference support, while [Porcupine's Python quick start](https://picovoice.ai/docs/quick-start/porcupine-python/) requires an account access key. VoiceDesk would also need to coordinate a continuously open microphone stream with Windows speech recognition and demonstrate false-trigger behavior on the target PC. Keep push-to-start as the supported mode until that integration can be verified on hardware.
+
 **Done when:**
 
 - Wake-word mode requires explicit opt-in and has a persistent visible listening indicator and stop control.
@@ -193,11 +207,11 @@ git commit -m "Prototype local wake word mode (Closes #<issue-number>)"
 git push origin master
 ```
 
-## Step 9 — Prepare a stable public release
+## Step 9 — Verify and publish the 0.2.0 source preview
 
-**GitHub Issue title:** `Prepare VoiceDesk 1.0 release`
+**GitHub Issue title:** `Verify and publish VoiceDesk 0.2.0 source preview`
 
-**Goal:** Turn the verified source preview into a release someone else can install, understand, and remove.
+**Goal:** Finish the Windows checks and publish the prepared source archive with honest limitations.
 
 **Done when:**
 
@@ -205,11 +219,12 @@ git push origin master
 - Version, release notes, requirements, privacy details, and removal steps agree.
 - The source ZIP contains only the intended release files and extracts into a clear folder.
 - GitHub Release notes include setup, known limitations, and rollback/removal guidance.
+- Create a GitHub Release only after the checks pass; identify it as an unsigned source preview, not a stable 1.0 installer.
 - Any installer or signing work is included only if the source ZIP workflow proves insufficient.
 
 ```powershell
-git add VERSION RELEASE_NOTES.md README.md PRIVACY.md package-release.ps1
-git commit -m "Prepare VoiceDesk release (Closes #<issue-number>)"
+git add VERSION RELEASE_NOTES.md README.md PRIVACY.md WINDOWS-ACCEPTANCE.md package-release.ps1
+git commit -m "Prepare VoiceDesk 0.2.0 preview (Closes #<issue-number>)"
 git push origin master
 ```
 

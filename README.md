@@ -2,7 +2,7 @@
 
 A Windows desktop voice-control prototype with an allowlisted set of desktop actions. Exact commands work locally; optional AI maps natural-language requests to those actions. Speech recognition runs on Windows, so raw microphone audio is not sent to the AI service. The app shows microphone status, recognized speech, and action results.
 
-See [ROADMAP.md](ROADMAP.md) for the GitHub-tracked steps toward a more capable assistant.
+See [ROADMAP.md](ROADMAP.md) for the GitHub build plan and [WINDOWS-ACCEPTANCE.md](WINDOWS-ACCEPTANCE.md) for the manual release checklist.
 
 ## Requirements
 
