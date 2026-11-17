@@ -3,6 +3,7 @@
 - Voice capture starts only after you press **Start listening**. Windows speech recognition transcribes locally.
 - Optional spoken replies use the installed Windows voice locally. Listening pauses during playback; voice output is not sent to OpenAI.
 - Exact basic commands are handled on the PC. Other recognized requests are sent to OpenAI through the local Node service only when **Enable cloud AI** is checked; it is off by default. API use may incur charges.
+- Optional conversation context is off by default. When enabled, VoiceDesk temporarily keeps up to three non-screen cloud voice turns in memory and sends that context with later cloud requests. Unchecking the option, using **Clear conversation context**, or closing VoiceDesk clears it. Screen text and screenshots are never added to this context.
 - Screen questions send accessible text from the active window to OpenAI. When accessibility text is insufficient, VoiceDesk shows a screenshot preview and sends it only after you choose **Send to OpenAI**.
 - Camera capture starts only after you press **Start camera gestures**. Hand tracking runs locally in a separate preview. Camera frames are not saved or sent to OpenAI.
 - VoiceDesk does not intentionally save transcripts, screenshots, or camera frames.

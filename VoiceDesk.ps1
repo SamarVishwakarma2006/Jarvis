@@ -121,13 +121,16 @@ function Resolve-VoiceIntent {
         return @{ intent = 'unknown'; reply = 'Cloud AI is off. Enable it in VoiceDesk for natural-language commands.'; question = $Text }
     }
 
-    $payload = @{ text = $Text } | ConvertTo-Json -Compress
+    $payloadObject = @{ text = $Text }
+    if ($state.ContextEnabled -and $state.Context.Count -gt 0) { $payloadObject.context = @($state.Context) }
+    $payload = $payloadObject | ConvertTo-Json -Depth 4 -Compress
     $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 35
     $allowed = @('open_notepad','open_calculator','open_explorer','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','unknown')
     if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
         throw 'AI returned an invalid action. No desktop action was run.'
     }
     $intent.requires_confirmation = ($intent.intent -eq 'close_window')
+    $intent.used_cloud_ai = $true
     $intent | Add-Member -NotePropertyName question -NotePropertyValue $Text -Force
     return $intent
 }
@@ -358,6 +361,13 @@ $resumeGestureToggle = [System.Windows.Forms.CheckBox]::new()
 $resumeGestureToggle.Text = 'Allow open-palm gesture to resume voice'
 $resumeGestureToggle.AutoSize = $true
 $resumeGestureToggle.Checked = $true
+$contextToggle = [System.Windows.Forms.CheckBox]::new()
+$contextToggle.Text = 'Keep up to three cloud voice turns for follow-up requests (session only)'
+$contextToggle.AutoSize = $true
+$contextToggle.Checked = $false
+$clearContextButton = [System.Windows.Forms.Button]::new()
+$clearContextButton.Text = 'Clear conversation context'
+$clearContextButton.AutoSize = $true
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -370,17 +380,21 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
-$layout.RowCount = 15
+$layout.RowCount = 17
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
+$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 $layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 $layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 $layout.Controls.Add($targetStatus, 0, 11)
 $layout.Controls.Add($targetButton, 0, 12)
 $layout.Controls.Add($pauseGestureToggle, 0, 13)
 $layout.Controls.Add($resumeGestureToggle, 0, 14)
+$layout.Controls.Add($contextToggle, 0, 15)
+$layout.Controls.Add($clearContextButton, 0, 16)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; TargetHandle = [IntPtr]::Zero; TargetTitle = $null }
+$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; ContextEnabled = $false; Context = @(); TargetHandle = [IntPtr]::Zero; TargetTitle = $null }
 
 function Stop-AllCapture {
     $state.GesturePaused = $false
@@ -459,6 +473,14 @@ $pauseGestureToggle.add_CheckedChanged({ $state.GesturePauseEnabled = $pauseGest
 $resumeGestureToggle.add_CheckedChanged({ $state.GestureResumeEnabled = $resumeGestureToggle.Checked })
 $state.GesturePauseEnabled = $pauseGestureToggle.Checked
 $state.GestureResumeEnabled = $resumeGestureToggle.Checked
+$contextToggle.add_CheckedChanged({
+    $state.ContextEnabled = $contextToggle.Checked
+    if (-not $state.ContextEnabled) { $state.Context = @() }
+})
+$clearContextButton.add_Click({
+    $state.Context = @()
+    $hint.Text = 'Cloud conversation context cleared.'
+})
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
@@ -562,6 +584,12 @@ if (-not $recognizerInfo) {
                     } else {
                         $intent = Resolve-VoiceIntent -Text $command
                         $result = Invoke-IntentFromVoice -Intent $intent
+                        if ($intent.used_cloud_ai -and $state.ContextEnabled -and $intent.intent -ne 'screen_question') {
+                            $form.Invoke([System.Action] {
+                                $state.Context += @(@{ role = 'user'; content = $command }, @{ role = 'assistant'; content = $result })
+                                if ($state.Context.Count -gt 6) { $state.Context = @($state.Context | Select-Object -Last 6) }
+                            }) | Out-Null
+                        }
                     }
                 } catch {
                     $result = "No action was run: $($_.Exception.Message)"

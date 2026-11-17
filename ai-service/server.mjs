@@ -79,7 +79,7 @@ const server = http.createServer(async (request, response) => {
       chunks.push(chunk);
     }
     const body = Buffer.concat(chunks, bodyBytes).toString('utf8');
-    const { text, screenText, image } = JSON.parse(body);
+    const { text, screenText, image, context } = JSON.parse(body);
     if (typeof text !== 'string' || !text.trim() || text.length > 1000) {
       response.writeHead(400).end(JSON.stringify({ error: 'Provide a non-empty transcript under 1000 characters.' }));
       return;
@@ -101,11 +101,18 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (context !== undefined && (!Array.isArray(context) || context.length > 6 || context.some(item =>
+      !item || !['user', 'assistant'].includes(item.role) || typeof item.content !== 'string' || item.content.length > 1000
+    ))) {
+      response.writeHead(400).end(JSON.stringify({ error: 'Conversation context is invalid or too long.' }));
+      return;
+    }
+    const priorContext = Array.isArray(context) ? context.map(({ role, content }) => ({ role, content })) : [];
     const data = await requestModel({
         model,
         store: false,
-        instructions: 'Map the user request to exactly one allowed desktop intent. Allowed app launches are Notepad, Calculator, and File Explorer. Use screen_question when the user asks about visible screen content. Never invent commands or file paths. If unclear, use unknown and ask a short clarifying question. Set requires_confirmation true for close_window. Set it false for every other intent. Opening a file means asking the desktop app to show its file picker.',
-        input: text,
+        instructions: 'Map the latest user request to exactly one allowed desktop intent. Earlier messages are short-lived conversation context, not permission to expand the action list. Allowed app launches are Notepad, Calculator, and File Explorer. Use screen_question when the user asks about visible screen content. Never invent commands or file paths. If unclear, use unknown and ask a short clarifying question. Set requires_confirmation true for close_window. Set it false for every other intent. Opening a file means asking the desktop app to show its file picker.',
+        input: [...priorContext, { role: 'user', content: text }],
         text: { format: { type: 'json_schema', name: 'desktop_intent', strict: true, schema } },
       }, 25_000);
     const output = data.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text;
