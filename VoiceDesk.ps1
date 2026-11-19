@@ -105,6 +105,7 @@ function Resolve-VoiceIntent {
     param([Parameter(Mandatory)][string]$Text)
     $localIntents = @{
         'open notepad' = 'open_notepad'; 'open calculator' = 'open_calculator'; 'open file explorer' = 'open_explorer'; 'open windows settings' = 'open_settings'; 'open file' = 'open_file'
+        'open work tools' = 'run_work_tools_routine'
         'minimize window' = 'minimize_window'; 'maximize window' = 'maximize_window'
         'close window' = 'close_window'; 'take screenshot' = 'take_screenshot'
         'what is on my screen' = 'screen_question'; 'what is on the screen' = 'screen_question'
@@ -126,7 +127,7 @@ function Resolve-VoiceIntent {
     if ($state.ContextEnabled -and $state.Context.Count -gt 0) { $payloadObject.context = @($state.Context) }
     $payload = $payloadObject | ConvertTo-Json -Depth 4 -Compress
     $intent = Invoke-RestMethod -Uri 'http://127.0.0.1:43127/intent' -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 35
-    $allowed = @('open_notepad','open_calculator','open_explorer','open_settings','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','unknown')
+    $allowed = @('open_notepad','open_calculator','open_explorer','open_settings','open_file','minimize_window','maximize_window','close_window','take_screenshot','screen_question','run_work_tools_routine','unknown')
     if ($intent.intent -notin $allowed -or [string]::IsNullOrWhiteSpace($intent.reply)) {
         throw 'AI returned an invalid action. No desktop action was run.'
     }
@@ -240,6 +241,7 @@ function Invoke-IntentFromVoice {
     param([Parameter(Mandatory)]$Intent)
     if ($Intent.intent -eq 'unknown') { return $Intent.reply }
     if ($Intent.intent -eq 'screen_question') { return Get-ScreenAnswer -Question $Intent.question }
+    if ($Intent.intent -eq 'run_work_tools_routine') { return Show-WorkToolsRoutinePreview }
     $target = $null
     if ($Intent.intent -in @('minimize_window', 'maximize_window', 'close_window')) {
         if ($state.TargetHandle -ne [IntPtr]::Zero) {
@@ -279,13 +281,16 @@ function Show-WorkToolsRoutinePreview {
         @{ action = 'open_notepad'; label = 'Open Notepad' },
         @{ action = 'open_explorer'; label = 'Open File Explorer' }
     )
-    $confirm = [System.Windows.Forms.MessageBox]::Show(
-        $form, "Run this routine?`r`n`r`n1. Open Notepad`r`n2. Open File Explorer",
-        'Preview routine: Open work tools', [System.Windows.Forms.MessageBoxButtons]::OKCancel,
-        [System.Windows.Forms.MessageBoxIcon]::Information
-    )
-    if ($confirm -ne [System.Windows.Forms.DialogResult]::OK) {
-        $lastAction.Text = 'Last action: Routine cancelled. Nothing was run.'
+    $decision = @{ Approved = $false }
+    $form.Invoke([System.Action] {
+        $decision.Approved = ([System.Windows.Forms.MessageBox]::Show(
+            $form, "Run this routine?`r`n`r`n1. Open Notepad`r`n2. Open File Explorer",
+            'Preview routine: Open work tools', [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) -eq [System.Windows.Forms.DialogResult]::OK)
+    }) | Out-Null
+    if (-not $decision.Approved) {
+        $form.Invoke([System.Action] { $lastAction.Text = 'Last action: Routine cancelled. Nothing was run.' }) | Out-Null
         return
     }
     $receipt = [System.Collections.Generic.List[string]]::new()
@@ -299,8 +304,11 @@ function Show-WorkToolsRoutinePreview {
         }
     }
     if ($receipt.Count -lt $steps.Count) { $receipt.Add('Remaining steps were skipped.') }
-    $lastAction.Text = "Last action: Open work tools — $($receipt.Count) result lines."
-    [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), 'Routine result')
+    $summary = "Open work tools — $($receipt.Count) result lines."
+    $form.Invoke([System.Action] {
+        $lastAction.Text = "Last action: $summary"
+        [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), 'Routine result')
+    }) | Out-Null
 }
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
