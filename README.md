@@ -83,6 +83,8 @@ Start VoiceDesk and check **Enable cloud AI** only when you want to send non-exa
 
 AI output is a proposed intent from a fixed schema. VoiceDesk validates the intent and maps it to its own allowlisted actions; model output is never executed as shell code. Unknown requests result in a clarifying response, and closing a window requires an explicit confirmation. This remains a prototype, not an unrestricted desktop agent.
 
+The routine format foundation is in [`routine.schema.json`](routine.schema.json). It limits routines to a short list of existing action IDs and rejects additional fields. Routine editing, preview, and execution are not implemented yet.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

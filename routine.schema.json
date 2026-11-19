@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voicedesk.local/schemas/routine-v1.json",
+  "title": "VoiceDesk Routine",
+  "description": "A user-created sequence of VoiceDesk action IDs. Routines cannot contain scripts, commands, paths, or extra properties.",
+  "type": "object",
+  "required": ["version", "id", "name", "phrases", "steps"],
+  "properties": {
+    "version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "maxLength": 64
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "phrases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": {
+            "enum": [
+              "open_notepad",
+              "open_calculator",
+              "open_explorer",
+              "open_settings",
+              "open_file",
+              "minimize_window",
+              "maximize_window",
+              "close_window",
+              "take_screenshot"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
