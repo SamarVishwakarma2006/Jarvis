@@ -274,6 +274,35 @@ function Invoke-IntentFromVoice {
     return Invoke-DesktopAction -Name $actionName
 }
 
+function Show-WorkToolsRoutinePreview {
+    $steps = @(
+        @{ action = 'open_notepad'; label = 'Open Notepad' },
+        @{ action = 'open_explorer'; label = 'Open File Explorer' }
+    )
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        $form, "Run this routine?`r`n`r`n1. Open Notepad`r`n2. Open File Explorer",
+        'Preview routine: Open work tools', [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+    )
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::OK) {
+        $lastAction.Text = 'Last action: Routine cancelled. Nothing was run.'
+        return
+    }
+    $receipt = [System.Collections.Generic.List[string]]::new()
+    foreach ($step in $steps) {
+        try {
+            $result = Invoke-IntentFromVoice -Intent @{ intent = $step.action; reply = $step.label }
+            $receipt.Add("Completed: $($step.label) — $result")
+        } catch {
+            $receipt.Add("Failed: $($step.label) — $($_.Exception.Message)")
+            break
+        }
+    }
+    if ($receipt.Count -lt $steps.Count) { $receipt.Add('Remaining steps were skipped.') }
+    $lastAction.Text = "Last action: Open work tools — $($receipt.Count) result lines."
+    [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), 'Routine result')
+}
+
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $culture = (Get-Culture).Name
 $recognizerInfo = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers() |
@@ -369,6 +398,9 @@ $contextToggle.Checked = $false
 $clearContextButton = [System.Windows.Forms.Button]::new()
 $clearContextButton.Text = 'Clear conversation context'
 $clearContextButton.AutoSize = $true
+$routineButton = [System.Windows.Forms.Button]::new()
+$routineButton.Text = 'Preview routine: Open work tools'
+$routineButton.AutoSize = $true
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -381,7 +413,7 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
-$layout.RowCount = 17
+$layout.RowCount = 18
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
@@ -394,6 +426,7 @@ $layout.Controls.Add($pauseGestureToggle, 0, 13)
 $layout.Controls.Add($resumeGestureToggle, 0, 14)
 $layout.Controls.Add($contextToggle, 0, 15)
 $layout.Controls.Add($clearContextButton, 0, 16)
+$layout.Controls.Add($routineButton, 0, 17)
 $form.Controls.Add($layout)
 $state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; ContextEnabled = $false; Context = @(); TargetHandle = [IntPtr]::Zero; TargetTitle = $null }
 
@@ -482,6 +515,7 @@ $clearContextButton.add_Click({
     $state.Context = @()
     $hint.Text = 'Cloud conversation context cleared.'
 })
+$routineButton.add_Click({ Show-WorkToolsRoutinePreview })
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
