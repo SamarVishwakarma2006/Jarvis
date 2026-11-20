@@ -1,0 +1,12 @@
+[
+  {
+    "version": 1,
+    "id": "open_work_tools",
+    "name": "Open work tools",
+    "phrases": ["open work tools"],
+    "steps": [
+      { "action": "open_notepad" },
+      { "action": "open_explorer" }
+    ]
+  }
+]

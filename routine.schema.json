@@ -39,14 +39,7 @@
           "action": {
             "enum": [
               "open_notepad",
-              "open_calculator",
-              "open_explorer",
-              "open_settings",
-              "open_file",
-              "minimize_window",
-              "maximize_window",
-              "close_window",
-              "take_screenshot"
+              "open_explorer"
             ]
           }
         },

@@ -276,16 +276,45 @@ function Invoke-IntentFromVoice {
     return Invoke-DesktopAction -Name $actionName
 }
 
+function Get-ValidatedRoutine {
+    param([Parameter(Mandatory)][string]$Id)
+    $schema = Get-Content (Join-Path $PSScriptRoot 'routine.schema.json') -Raw | ConvertFrom-Json
+    $definitions = @(Get-Content (Join-Path $PSScriptRoot 'routines.json') -Raw | ConvertFrom-Json)
+    $allowedActions = @($schema.properties.steps.items.properties.action.enum)
+    foreach ($routine in $definitions) {
+        $rootKeys = @($routine.PSObject.Properties.Name)
+        if ($routine.version -ne 1 -or $rootKeys.Count -ne 5 -or @('version','id','name','phrases','steps' | Where-Object { $_ -notin $rootKeys }).Count -gt 0) {
+            throw 'A routine has an invalid format or unsupported fields.'
+        }
+        if ($routine.id -notmatch '^[a-z0-9_]{1,64}$' -or [string]::IsNullOrWhiteSpace($routine.name) -or $routine.name.Length -gt 80) {
+            throw 'A routine has an invalid ID or name.'
+        }
+        $phrases = @($routine.phrases)
+        if ($phrases.Count -lt 1 -or $phrases.Count -gt 5 -or @($phrases | Where-Object { $_ -isnot [string] -or [string]::IsNullOrWhiteSpace($_) -or $_.Length -gt 100 }).Count -gt 0 -or @($phrases | Select-Object -Unique).Count -ne $phrases.Count) {
+            throw "Routine '$($routine.id)' has invalid voice phrases."
+        }
+        $steps = @($routine.steps)
+        if ($steps.Count -lt 1 -or $steps.Count -gt 10) { throw "Routine '$($routine.id)' has an invalid number of steps." }
+        foreach ($step in $steps) {
+            $stepKeys = @($step.PSObject.Properties.Name)
+            if ($stepKeys.Count -ne 1 -or $stepKeys[0] -ne 'action' -or $step.action -notin $allowedActions) {
+                throw "Routine '$($routine.id)' contains an unsupported action or field."
+            }
+        }
+        if ($routine.id -eq $Id) { return $routine }
+    }
+    throw "Routine '$Id' was not found."
+}
+
 function Show-WorkToolsRoutinePreview {
-    $steps = @(
-        @{ action = 'open_notepad'; label = 'Open Notepad' },
-        @{ action = 'open_explorer'; label = 'Open File Explorer' }
-    )
+    $routine = Get-ValidatedRoutine -Id 'open_work_tools'
+    $labels = @{ open_notepad = 'Open Notepad'; open_explorer = 'Open File Explorer' }
+    $steps = @($routine.steps)
+    $previewText = "Run '$($routine.name)'?`r`n`r`n" + (($steps | ForEach-Object { $labels[$_.action] }) -join "`r`n")
     $decision = @{ Approved = $false }
     $form.Invoke([System.Action] {
         $decision.Approved = ([System.Windows.Forms.MessageBox]::Show(
-            $form, "Run this routine?`r`n`r`n1. Open Notepad`r`n2. Open File Explorer",
-            'Preview routine: Open work tools', [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+            $form, $previewText, "Preview routine: $($routine.name)", [System.Windows.Forms.MessageBoxButtons]::OKCancel,
             [System.Windows.Forms.MessageBoxIcon]::Information
         ) -eq [System.Windows.Forms.DialogResult]::OK)
     }) | Out-Null
@@ -297,17 +326,17 @@ function Show-WorkToolsRoutinePreview {
     foreach ($step in $steps) {
         try {
             $result = Invoke-IntentFromVoice -Intent @{ intent = $step.action; reply = $step.label }
-            $receipt.Add("Completed: $($step.label) — $result")
+            $receipt.Add("Completed: $($labels[$step.action]) — $result")
         } catch {
-            $receipt.Add("Failed: $($step.label) — $($_.Exception.Message)")
+            $receipt.Add("Failed: $($labels[$step.action]) — $($_.Exception.Message)")
             break
         }
     }
     if ($receipt.Count -lt $steps.Count) { $receipt.Add('Remaining steps were skipped.') }
-    $summary = "Open work tools — $($receipt.Count) result lines."
+    $summary = "$($routine.name) — $($receipt.Count) result lines."
     $form.Invoke([System.Action] {
         $lastAction.Text = "Last action: $summary"
-        [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), 'Routine result')
+        [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), "$($routine.name) — result")
     }) | Out-Null
 }
 

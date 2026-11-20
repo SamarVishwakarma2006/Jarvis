@@ -6,7 +6,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'VERSION must use the format m
 $files = @(
     'README.md', 'LICENSE', 'PRIVACY.md', 'RELEASE_NOTES.md', 'WINDOWS-ACCEPTANCE.md', 'routine.schema.json', 'VERSION',
     'Run-VoiceDesk.cmd', 'Start-AI-Service.cmd', 'VoiceDesk.ps1', 'package-release.ps1',
-    'ai-service', 'gesture_service.py', 'requirements-gestures.txt'
+    'ai-service', 'routines.json', 'gesture_service.py', 'requirements-gestures.txt'
 )
 foreach ($file in $files) {
     if (-not (Test-Path (Join-Path $root $file))) { throw "Release file is missing: $file" }
