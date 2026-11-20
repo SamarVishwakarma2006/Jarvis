@@ -73,6 +73,10 @@ function Invoke-DesktopAction {
         [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}')
         return "Sent Print Screen for '$($target.Title)'; no image file was saved."
     }
+    if ($Name -in @('MinimizeWindow', 'MaximizeWindow', 'CloseWindow')) {
+        $state.LastUndo = $null
+        if ($undoButton) { $form.BeginInvoke([System.Action] { $undoButton.Enabled = $false }) | Out-Null }
+    }
 
     try {
         if ($TargetHandle -eq [IntPtr]::Zero -and [VoiceDeskNative]::GetForegroundWindow() -ne $target.Handle) {
@@ -81,10 +85,20 @@ function Invoke-DesktopAction {
         $pattern = $null
         $hasWindowPattern = $target.Element.TryGetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern, [ref]$pattern)
         if (-not $hasWindowPattern) { throw 'The window does not expose the UI Automation window pattern.' }
+        $priorState = $null
+        $appliedState = $null
+        if ($Name -in @('MinimizeWindow', 'MaximizeWindow')) {
+            $priorState = $pattern.Current.WindowVisualState
+            $appliedState = if ($Name -eq 'MinimizeWindow') { [System.Windows.Automation.WindowVisualState]::Minimized } else { [System.Windows.Automation.WindowVisualState]::Maximized }
+        }
         switch ($Name) {
-            'MinimizeWindow' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Minimized) }
-            'MaximizeWindow' { $pattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Maximized) }
+            'MinimizeWindow' { $pattern.SetWindowVisualState($appliedState) }
+            'MaximizeWindow' { $pattern.SetWindowVisualState($appliedState) }
             'CloseWindow' { $pattern.Close() }
+        }
+        if ($priorState -ne $null) {
+            $state.LastUndo = @{ Handle = $target.Handle; Title = $target.Title; PriorState = $priorState; AppliedState = $appliedState }
+            if ($undoButton) { $form.BeginInvoke([System.Action] { $undoButton.Enabled = $true }) | Out-Null }
         }
         return "$Name completed for '$($target.Title)' using UI Automation."
     } catch {
@@ -306,6 +320,31 @@ function Get-ValidatedRoutine {
     throw "Routine '$Id' was not found."
 }
 
+function Undo-LastWindowChange {
+    $entry = $state.LastUndo
+    if (-not $entry) { $lastAction.Text = 'Last action: No reversible window change is available.'; return }
+    try {
+        $target = Get-ActiveTarget -Handle $entry.Handle
+        if ($target.Title -ne $entry.Title) { throw 'The original window is no longer available.' }
+        $pattern = $null
+        if (-not $target.Element.TryGetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern, [ref]$pattern)) {
+            throw 'The original window no longer supports restoration.'
+        }
+        if ($pattern.Current.WindowVisualState -ne $entry.AppliedState) {
+            throw 'The window state changed after VoiceDesk acted. No undo was applied.'
+        }
+        $pattern.SetWindowVisualState($entry.PriorState)
+        if ($pattern.Current.WindowVisualState -ne $entry.PriorState) { throw 'Windows did not confirm the restored state.' }
+        $state.LastUndo = $null
+        $undoButton.Enabled = $false
+        $lastAction.Text = "Last action: Restored '$($target.Title)' to its prior window state."
+    } catch {
+        $state.LastUndo = $null
+        $undoButton.Enabled = $false
+        $lastAction.Text = "Last action: Undo unavailable. $($_.Exception.Message)"
+    }
+}
+
 function Show-WorkToolsRoutinePreview {
     $routine = Get-ValidatedRoutine -Id 'open_work_tools'
     $labels = @{ open_notepad = 'Open Notepad'; open_explorer = 'Open File Explorer' }
@@ -438,6 +477,10 @@ $clearContextButton.AutoSize = $true
 $routineButton = [System.Windows.Forms.Button]::new()
 $routineButton.Text = 'Preview routine: Open work tools'
 $routineButton.AutoSize = $true
+$undoButton = [System.Windows.Forms.Button]::new()
+$undoButton.Text = 'Undo last window change'
+$undoButton.AutoSize = $true
+$undoButton.Enabled = $false
 
 $layout.Controls.Add($status, 0, 0)
 $layout.Controls.Add($hint, 0, 1)
@@ -450,7 +493,7 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
-$layout.RowCount = 18
+$layout.RowCount = 19
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
@@ -464,8 +507,9 @@ $layout.Controls.Add($resumeGestureToggle, 0, 14)
 $layout.Controls.Add($contextToggle, 0, 15)
 $layout.Controls.Add($clearContextButton, 0, 16)
 $layout.Controls.Add($routineButton, 0, 17)
+$layout.Controls.Add($undoButton, 0, 18)
 $form.Controls.Add($layout)
-$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; ContextEnabled = $false; Context = @(); TargetHandle = [IntPtr]::Zero; TargetTitle = $null }
+$state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; ContextEnabled = $false; Context = @(); TargetHandle = [IntPtr]::Zero; TargetTitle = $null; LastUndo = $null }
 
 function Stop-AllCapture {
     $state.GesturePaused = $false
@@ -553,6 +597,7 @@ $clearContextButton.add_Click({
     $hint.Text = 'Cloud conversation context cleared.'
 })
 $routineButton.add_Click({ Show-WorkToolsRoutinePreview })
+$undoButton.add_Click({ Undo-LastWindowChange })
 
 if (-not $recognizerInfo) {
     $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."

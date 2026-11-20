@@ -84,6 +84,8 @@ Start VoiceDesk and check **Enable cloud AI** only when you want to send non-exa
 
 AI output is a proposed intent from a fixed schema. VoiceDesk validates the intent and maps it to its own allowlisted actions; model output is never executed as shell code. Unknown requests result in a clarifying response, and closing a window requires an explicit confirmation. This remains a prototype, not an unrestricted desktop agent.
 
+**Undo last window change** restores a UI Automation minimize/maximize to its prior state only if the same window is still there and unchanged. Keyboard shortcuts do not support undo.
+
 The routine format is defined by [`routine.schema.json`](routine.schema.json), and the built-in example is in [`routines.json`](routines.json). VoiceDesk validates the routine and every action ID before showing its preview. A routine editor and user-created routines are not implemented yet.
 
 ## License
