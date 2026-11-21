@@ -397,8 +397,10 @@ function Show-WorkToolsRoutinePreview {
 }
 
 function Show-RoutineEditor {
+    param([string]$Id, $Owner = $form)
+    $current = if ($Id) { Get-ValidatedRoutine -Id $Id } else { $null }
     $editor = [System.Windows.Forms.Form]::new()
-    $editor.Text = 'Create a local voice routine'
+    $editor.Text = if ($current) { 'Edit a local voice routine' } else { 'Create a local voice routine' }
     $editor.StartPosition = 'CenterParent'
     $editor.Size = [System.Drawing.Size]::new(400, 330)
     $panel = [System.Windows.Forms.FlowLayoutPanel]::new()
@@ -410,27 +412,34 @@ function Show-RoutineEditor {
     $actionLabel = [System.Windows.Forms.Label]::new(); $actionLabel.Text = 'Actions'; $actionLabel.AutoSize = $true
     $actionList = [System.Windows.Forms.CheckedListBox]::new(); $actionList.Width = 340; $actionList.Height = 70
     [void]$actionList.Items.Add('Open Notepad'); [void]$actionList.Items.Add('Open File Explorer')
+    if ($current) {
+        $nameBox.Text = $current.name; $phraseBox.Text = $current.phrases[0]
+        for ($index = 0; $index -lt $actionList.Items.Count; $index++) {
+            $actionId = @{ 0 = 'open_notepad'; 1 = 'open_explorer' }[$index]
+            if ($actionId -in @($current.steps | ForEach-Object action)) { $actionList.SetItemChecked($index, $true) }
+        }
+    }
     $save = [System.Windows.Forms.Button]::new(); $save.Text = 'Save routine'; $save.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $cancel = [System.Windows.Forms.Button]::new(); $cancel.Text = 'Cancel'; $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     foreach ($control in @($nameLabel,$nameBox,$phraseLabel,$phraseBox,$actionLabel,$actionList,$save,$cancel)) { $panel.Controls.Add($control) }
     $editor.Controls.Add($panel); $editor.AcceptButton = $save; $editor.CancelButton = $cancel
     try {
-        if ($editor.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        if ($editor.ShowDialog($Owner) -ne [System.Windows.Forms.DialogResult]::OK) { return }
         $name = $nameBox.Text.Trim(); $phrase = $phraseBox.Text.Trim().ToLowerInvariant()
         if (-not $name -or $name.Length -gt 80 -or -not $phrase -or $phrase.Length -gt 100 -or $actionList.CheckedItems.Count -eq 0) {
             throw 'Enter a name, one spoken phrase, and at least one action.'
         }
         $catalog = @(Get-ValidatedRoutine)
-        if (@($catalog | Where-Object { @($_.phrases | ForEach-Object { $_.Trim().ToLowerInvariant() }) -contains $phrase }).Count -gt 0) {
+        if (@($catalog | Where-Object { $_.id -ne $Id -and @($_.phrases | ForEach-Object { $_.Trim().ToLowerInvariant() }) -contains $phrase }).Count -gt 0) {
             throw 'That spoken phrase is already used.'
         }
         $actionIds = @{ 'Open Notepad' = 'open_notepad'; 'Open File Explorer' = 'open_explorer' }
         $steps = @($actionList.CheckedItems | ForEach-Object { @{ action = $actionIds[[string]$_] } })
-        $routine = @{ version = 1; id = ('user_' + [guid]::NewGuid().ToString('N')); name = $name; phrases = @($phrase); steps = $steps }
+        $routine = @{ version = 1; id = $(if ($current) { $current.id } else { 'user_' + [guid]::NewGuid().ToString('N') }); name = $name; phrases = @($phrase); steps = $steps }
         $directory = Join-Path $env:LOCALAPPDATA 'VoiceDesk'
         [void][System.IO.Directory]::CreateDirectory($directory)
         $userFile = Join-Path $directory 'routines.json'
-        $existing = @(); if (Test-Path $userFile) { $existing = @(Get-Content $userFile -Raw | ConvertFrom-Json) }
+        $existing = @(); if (Test-Path $userFile) { $existing = @(Get-Content $userFile -Raw | ConvertFrom-Json | Where-Object id -ne $routine.id) }
         $tempFile = "$userFile.$([guid]::NewGuid().ToString('N')).tmp"
         [System.IO.File]::WriteAllText($tempFile, (ConvertTo-Json -InputObject @($existing + $routine) -Depth 6), [System.Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $tempFile -Destination $userFile -Force
@@ -447,10 +456,21 @@ function Show-RoutineManager {
     $manager.Text = 'Manage local routines'; $manager.StartPosition = 'CenterParent'; $manager.Size = [System.Drawing.Size]::new(420, 300)
     $list = [System.Windows.Forms.ListBox]::new(); $list.Dock = 'Fill'; $list.DisplayMember = 'Display'
     foreach ($routine in $routines) { [void]$list.Items.Add([pscustomobject]@{ Id = $routine.id; Display = "$($routine.name) — $($routine.phrases -join ', ')" }) }
+    $edit = [System.Windows.Forms.Button]::new(); $edit.Text = 'Edit selected'; $edit.AutoSize = $true
     $remove = [System.Windows.Forms.Button]::new(); $remove.Text = 'Delete selected'; $remove.AutoSize = $true
     $close = [System.Windows.Forms.Button]::new(); $close.Text = 'Close'; $close.AutoSize = $true
     $buttons = [System.Windows.Forms.FlowLayoutPanel]::new(); $buttons.Dock = 'Bottom'; $buttons.AutoSize = $true
-    $buttons.Controls.Add($remove); $buttons.Controls.Add($close); $manager.Controls.Add($list); $manager.Controls.Add($buttons)
+    $buttons.Controls.Add($edit); $buttons.Controls.Add($remove); $buttons.Controls.Add($close); $manager.Controls.Add($list); $manager.Controls.Add($buttons)
+    $edit.add_Click({
+        if (-not $list.SelectedItem) { return }
+        $item = $list.SelectedItem
+        Show-RoutineEditor -Id $item.Id -Owner $manager
+        try {
+            $updated = Get-ValidatedRoutine -Id $item.Id
+            $item.Display = "$($updated.name) — $($updated.phrases -join ', ')"
+            $list.Refresh()
+        } catch { }
+    })
     $remove.add_Click({
         if (-not $list.SelectedItem) { return }
         $item = $list.SelectedItem
