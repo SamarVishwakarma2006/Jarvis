@@ -407,13 +407,13 @@ function Show-RoutineEditor {
     $panel.Dock = 'Fill'; $panel.FlowDirection = 'TopDown'; $panel.WrapContents = $false; $panel.Padding = [System.Windows.Forms.Padding]::new(12)
     $nameLabel = [System.Windows.Forms.Label]::new(); $nameLabel.Text = 'Routine name'; $nameLabel.AutoSize = $true
     $nameBox = [System.Windows.Forms.TextBox]::new(); $nameBox.Width = 340
-    $phraseLabel = [System.Windows.Forms.Label]::new(); $phraseLabel.Text = 'Spoken phrase'; $phraseLabel.AutoSize = $true
-    $phraseBox = [System.Windows.Forms.TextBox]::new(); $phraseBox.Width = 340
+    $phraseLabel = [System.Windows.Forms.Label]::new(); $phraseLabel.Text = 'Spoken phrases (one per line, up to five)'; $phraseLabel.AutoSize = $true
+    $phraseBox = [System.Windows.Forms.TextBox]::new(); $phraseBox.Width = 340; $phraseBox.Height = 55; $phraseBox.Multiline = $true
     $actionLabel = [System.Windows.Forms.Label]::new(); $actionLabel.Text = 'Actions'; $actionLabel.AutoSize = $true
     $actionList = [System.Windows.Forms.CheckedListBox]::new(); $actionList.Width = 340; $actionList.Height = 70
     [void]$actionList.Items.Add('Open Notepad'); [void]$actionList.Items.Add('Open File Explorer')
     if ($current) {
-        $nameBox.Text = $current.name; $phraseBox.Text = $current.phrases[0]
+        $nameBox.Text = $current.name; $phraseBox.Lines = @($current.phrases)
         for ($index = 0; $index -lt $actionList.Items.Count; $index++) {
             $actionId = @{ 0 = 'open_notepad'; 1 = 'open_explorer' }[$index]
             if ($actionId -in @($current.steps | ForEach-Object action)) { $actionList.SetItemChecked($index, $true) }
@@ -425,17 +425,19 @@ function Show-RoutineEditor {
     $editor.Controls.Add($panel); $editor.AcceptButton = $save; $editor.CancelButton = $cancel
     try {
         if ($editor.ShowDialog($Owner) -ne [System.Windows.Forms.DialogResult]::OK) { return }
-        $name = $nameBox.Text.Trim(); $phrase = $phraseBox.Text.Trim().ToLowerInvariant()
-        if (-not $name -or $name.Length -gt 80 -or -not $phrase -or $phrase.Length -gt 100 -or $actionList.CheckedItems.Count -eq 0) {
-            throw 'Enter a name, one spoken phrase, and at least one action.'
+        $name = $nameBox.Text.Trim()
+        $phrases = @($phraseBox.Lines | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
+        if (-not $name -or $name.Length -gt 80 -or $phrases.Count -lt 1 -or $phrases.Count -gt 5 -or @($phrases | Where-Object { $_.Length -gt 100 }).Count -gt 0 -or @($phrases | Select-Object -Unique).Count -ne $phrases.Count -or $actionList.CheckedItems.Count -eq 0) {
+            throw 'Enter a name, one to five unique spoken phrases (one per line), and at least one action.'
         }
         $catalog = @(Get-ValidatedRoutine)
-        if (@($catalog | Where-Object { $_.id -ne $Id -and @($_.phrases | ForEach-Object { $_.Trim().ToLowerInvariant() }) -contains $phrase }).Count -gt 0) {
+        $conflict = @($catalog | Where-Object { $_.id -ne $Id -and (@($_.phrases | ForEach-Object { $_.Trim().ToLowerInvariant() }) | Where-Object { $_ -in $phrases }).Count -gt 0 })
+        if ($conflict.Count -gt 0) {
             throw 'That spoken phrase is already used.'
         }
         $actionIds = @{ 'Open Notepad' = 'open_notepad'; 'Open File Explorer' = 'open_explorer' }
         $steps = @($actionList.CheckedItems | ForEach-Object { @{ action = $actionIds[[string]$_] } })
-        $routine = @{ version = 1; id = $(if ($current) { $current.id } else { 'user_' + [guid]::NewGuid().ToString('N') }); name = $name; phrases = @($phrase); steps = $steps }
+        $routine = @{ version = 1; id = $(if ($current) { $current.id } else { 'user_' + [guid]::NewGuid().ToString('N') }); name = $name; phrases = $phrases; steps = $steps }
         $directory = Join-Path $env:LOCALAPPDATA 'VoiceDesk'
         [void][System.IO.Directory]::CreateDirectory($directory)
         $userFile = Join-Path $directory 'routines.json'
@@ -444,7 +446,7 @@ function Show-RoutineEditor {
         [System.IO.File]::WriteAllText($tempFile, (ConvertTo-Json -InputObject @($existing + $routine) -Depth 6), [System.Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $tempFile -Destination $userFile -Force
         $null = Get-ValidatedRoutine -Id $routine.id
-        $hint.Text = "Saved '$name'. Say '$phrase' to preview the routine."
+        $hint.Text = "Saved '$name'. Say any saved phrase to preview the routine."
     } catch { $lastAction.Text = "Routine not saved: $($_.Exception.Message)" }
     finally { $editor.Dispose() }
 }

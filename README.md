@@ -88,7 +88,7 @@ AI output is a proposed intent from a fixed schema. VoiceDesk validates the inte
 
 The routine format is defined by [`routine.schema.json`](routine.schema.json), and the built-in example is in [`routines.json`](routines.json). VoiceDesk validates the routine and every action ID before showing its preview.
 
-Use **Create local routine** to save a routine with a name, one spoken phrase, and one or both currently supported actions: **Open Notepad** and **Open File Explorer**. **Manage local routines** lets you edit or delete saved user routines after selection; deletion requires confirmation, and the built-in routine is protected. User routines are stored in `%LOCALAPPDATA%\VoiceDesk\routines.json` and stay on this PC. Saying the saved phrase shows the same action preview and confirmation used by the built-in routine; actions only run after approval. The editor does not accept scripts, shell commands, or file paths.
+Use **Create local routine** to save a routine with a name, up to five spoken phrases (one per line), and one or both currently supported actions: **Open Notepad** and **Open File Explorer**. Any saved phrase triggers the same preview, and phrases cannot be shared between routines. **Manage local routines** lets you edit or delete saved user routines after selection; deletion requires confirmation, and the built-in routine is protected. User routines are stored in `%LOCALAPPDATA%\VoiceDesk\routines.json` and stay on this PC. Saying a saved phrase shows the same action preview and confirmation used by the built-in routine; actions only run after approval. The editor does not accept scripts, shell commands, or file paths.
 
 ## License
 
