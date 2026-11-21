@@ -364,7 +364,7 @@ function Undo-LastWindowChange {
 function Show-WorkToolsRoutinePreview {
     param([Parameter(Mandatory)][string]$Id)
     $routine = Get-ValidatedRoutine -Id $Id
-    $labels = @{ open_notepad = 'Open Notepad'; open_explorer = 'Open File Explorer' }
+    $labels = @{ open_notepad = 'Open Notepad'; open_explorer = 'Open File Explorer'; open_calculator = 'Open Calculator'; open_settings = 'Open Windows Settings' }
     $steps = @($routine.steps)
     $previewText = "Run '$($routine.name)'?`r`n`r`n" + (($steps | ForEach-Object { $labels[$_.action] }) -join "`r`n")
     $decision = @{ Approved = $false }
@@ -411,11 +411,11 @@ function Show-RoutineEditor {
     $phraseBox = [System.Windows.Forms.TextBox]::new(); $phraseBox.Width = 340; $phraseBox.Height = 55; $phraseBox.Multiline = $true
     $actionLabel = [System.Windows.Forms.Label]::new(); $actionLabel.Text = 'Actions'; $actionLabel.AutoSize = $true
     $actionList = [System.Windows.Forms.CheckedListBox]::new(); $actionList.Width = 340; $actionList.Height = 70
-    [void]$actionList.Items.Add('Open Notepad'); [void]$actionList.Items.Add('Open File Explorer')
+    [void]$actionList.Items.Add('Open Notepad'); [void]$actionList.Items.Add('Open File Explorer'); [void]$actionList.Items.Add('Open Calculator'); [void]$actionList.Items.Add('Open Windows Settings')
     if ($current) {
         $nameBox.Text = $current.name; $phraseBox.Lines = @($current.phrases)
         for ($index = 0; $index -lt $actionList.Items.Count; $index++) {
-            $actionId = @{ 0 = 'open_notepad'; 1 = 'open_explorer' }[$index]
+            $actionId = @{ 0 = 'open_notepad'; 1 = 'open_explorer'; 2 = 'open_calculator'; 3 = 'open_settings' }[$index]
             if ($actionId -in @($current.steps | ForEach-Object action)) { $actionList.SetItemChecked($index, $true) }
         }
     }
@@ -435,7 +435,7 @@ function Show-RoutineEditor {
         if ($conflict.Count -gt 0) {
             throw 'That spoken phrase is already used.'
         }
-        $actionIds = @{ 'Open Notepad' = 'open_notepad'; 'Open File Explorer' = 'open_explorer' }
+        $actionIds = @{ 'Open Notepad' = 'open_notepad'; 'Open File Explorer' = 'open_explorer'; 'Open Calculator' = 'open_calculator'; 'Open Windows Settings' = 'open_settings' }
         $steps = @($actionList.CheckedItems | ForEach-Object { @{ action = $actionIds[[string]$_] } })
         $routine = @{ version = 1; id = $(if ($current) { $current.id } else { 'user_' + [guid]::NewGuid().ToString('N') }); name = $name; phrases = $phrases; steps = $steps }
         $directory = Join-Path $env:LOCALAPPDATA 'VoiceDesk'

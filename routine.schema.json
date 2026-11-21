@@ -39,7 +39,9 @@
           "action": {
             "enum": [
               "open_notepad",
-              "open_explorer"
+              "open_explorer",
+              "open_calculator",
+              "open_settings"
             ]
           }
         },
