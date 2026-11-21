@@ -409,9 +409,23 @@ function Show-RoutineEditor {
     $nameBox = [System.Windows.Forms.TextBox]::new(); $nameBox.Width = 340
     $phraseLabel = [System.Windows.Forms.Label]::new(); $phraseLabel.Text = 'Spoken phrases (one per line, up to five)'; $phraseLabel.AutoSize = $true
     $phraseBox = [System.Windows.Forms.TextBox]::new(); $phraseBox.Width = 340; $phraseBox.Height = 55; $phraseBox.Multiline = $true
-    $actionLabel = [System.Windows.Forms.Label]::new(); $actionLabel.Text = 'Actions'; $actionLabel.AutoSize = $true
+    $actionLabel = [System.Windows.Forms.Label]::new(); $actionLabel.Text = 'Actions (select an item, then move it to set the order)'; $actionLabel.AutoSize = $true
     $actionList = [System.Windows.Forms.CheckedListBox]::new(); $actionList.Width = 340; $actionList.Height = 70
     [void]$actionList.Items.Add('Open Notepad'); [void]$actionList.Items.Add('Open File Explorer'); [void]$actionList.Items.Add('Open Calculator'); [void]$actionList.Items.Add('Open Windows Settings')
+    $moveUp = [System.Windows.Forms.Button]::new(); $moveUp.Text = 'Move up'; $moveUp.AutoSize = $true
+    $moveDown = [System.Windows.Forms.Button]::new(); $moveDown.Text = 'Move down'; $moveDown.AutoSize = $true
+    $orderButtons = [System.Windows.Forms.FlowLayoutPanel]::new(); $orderButtons.AutoSize = $true
+    $orderButtons.Controls.Add($moveUp); $orderButtons.Controls.Add($moveDown)
+    $moveAction = {
+        param([int]$Offset)
+        $from = $actionList.SelectedIndex; $to = $from + $Offset
+        if ($from -lt 0 -or $to -lt 0 -or $to -ge $actionList.Items.Count) { return }
+        $item = $actionList.Items[$from]; $checked = $actionList.GetItemChecked($from)
+        $actionList.Items.RemoveAt($from); $actionList.Items.Insert($to, $item)
+        $actionList.SetItemChecked($to, $checked); $actionList.SelectedIndex = $to
+    }
+    $moveUp.add_Click({ & $moveAction -1 })
+    $moveDown.add_Click({ & $moveAction 1 })
     if ($current) {
         $nameBox.Text = $current.name; $phraseBox.Lines = @($current.phrases)
         for ($index = 0; $index -lt $actionList.Items.Count; $index++) {
@@ -421,7 +435,7 @@ function Show-RoutineEditor {
     }
     $save = [System.Windows.Forms.Button]::new(); $save.Text = 'Save routine'; $save.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $cancel = [System.Windows.Forms.Button]::new(); $cancel.Text = 'Cancel'; $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-    foreach ($control in @($nameLabel,$nameBox,$phraseLabel,$phraseBox,$actionLabel,$actionList,$save,$cancel)) { $panel.Controls.Add($control) }
+    foreach ($control in @($nameLabel,$nameBox,$phraseLabel,$phraseBox,$actionLabel,$actionList,$orderButtons,$save,$cancel)) { $panel.Controls.Add($control) }
     $editor.Controls.Add($panel); $editor.AcceptButton = $save; $editor.CancelButton = $cancel
     try {
         if ($editor.ShowDialog($Owner) -ne [System.Windows.Forms.DialogResult]::OK) { return }
@@ -436,7 +450,7 @@ function Show-RoutineEditor {
             throw 'That spoken phrase is already used.'
         }
         $actionIds = @{ 'Open Notepad' = 'open_notepad'; 'Open File Explorer' = 'open_explorer'; 'Open Calculator' = 'open_calculator'; 'Open Windows Settings' = 'open_settings' }
-        $steps = @($actionList.CheckedItems | ForEach-Object { @{ action = $actionIds[[string]$_] } })
+        $steps = @(); for ($index = 0; $index -lt $actionList.Items.Count; $index++) { if ($actionList.GetItemChecked($index)) { $steps += @{ action = $actionIds[[string]$actionList.Items[$index]] } } }
         $routine = @{ version = 1; id = $(if ($current) { $current.id } else { 'user_' + [guid]::NewGuid().ToString('N') }); name = $name; phrases = $phrases; steps = $steps }
         $directory = Join-Path $env:LOCALAPPDATA 'VoiceDesk'
         [void][System.IO.Directory]::CreateDirectory($directory)
