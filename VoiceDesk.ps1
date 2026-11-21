@@ -133,6 +133,12 @@ function Resolve-VoiceIntent {
         return @{ intent = $localIntent; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window'); question = $Text }
     }
 
+    foreach ($routine in @(Get-ValidatedRoutine)) {
+        if (@($routine.phrases | ForEach-Object { $_.Trim().ToLowerInvariant() }) -contains $normalized) {
+            return @{ intent = 'run_routine'; routine_id = $routine.id; reply = 'Matched a saved local routine.'; question = $Text }
+        }
+    }
+
     if (-not $state.AiEnabled) {
         return @{ intent = 'unknown'; reply = 'Cloud AI is off. Enable it in VoiceDesk for natural-language commands.'; question = $Text }
     }
@@ -255,7 +261,8 @@ function Invoke-IntentFromVoice {
     param([Parameter(Mandatory)]$Intent)
     if ($Intent.intent -eq 'unknown') { return $Intent.reply }
     if ($Intent.intent -eq 'screen_question') { return Get-ScreenAnswer -Question $Intent.question }
-    if ($Intent.intent -eq 'run_work_tools_routine') { return Show-WorkToolsRoutinePreview }
+    if ($Intent.intent -eq 'run_work_tools_routine') { return Show-WorkToolsRoutinePreview -Id 'open_work_tools' }
+    if ($Intent.intent -eq 'run_routine') { return Show-WorkToolsRoutinePreview -Id $Intent.routine_id }
     $target = $null
     if ($Intent.intent -in @('minimize_window', 'maximize_window', 'close_window')) {
         if ($state.TargetHandle -ne [IntPtr]::Zero) {
@@ -291,10 +298,16 @@ function Invoke-IntentFromVoice {
 }
 
 function Get-ValidatedRoutine {
-    param([Parameter(Mandatory)][string]$Id)
+    param([string]$Id)
     $schema = Get-Content (Join-Path $PSScriptRoot 'routine.schema.json') -Raw | ConvertFrom-Json
-    $definitions = @(Get-Content (Join-Path $PSScriptRoot 'routines.json') -Raw | ConvertFrom-Json)
+    $definitions = [System.Collections.Generic.List[object]]::new()
+    foreach ($file in @((Join-Path $PSScriptRoot 'routines.json'), (Join-Path $env:LOCALAPPDATA 'VoiceDesk\routines.json'))) {
+        if (Test-Path $file) {
+            foreach ($definition in @(Get-Content $file -Raw | ConvertFrom-Json)) { $definitions.Add($definition) }
+        }
+    }
     $allowedActions = @($schema.properties.steps.items.properties.action.enum)
+    $validated = [System.Collections.Generic.List[object]]::new()
     foreach ($routine in $definitions) {
         $rootKeys = @($routine.PSObject.Properties.Name)
         if ($routine.version -ne 1 -or $rootKeys.Count -ne 5 -or @('version','id','name','phrases','steps' | Where-Object { $_ -notin $rootKeys }).Count -gt 0) {
@@ -315,8 +328,11 @@ function Get-ValidatedRoutine {
                 throw "Routine '$($routine.id)' contains an unsupported action or field."
             }
         }
-        if ($routine.id -eq $Id) { return $routine }
+        $validated.Add($routine)
     }
+    if (-not $Id) { return $validated.ToArray() }
+    $match = $validated | Where-Object id -eq $Id | Select-Object -First 1
+    if ($match) { return $match }
     throw "Routine '$Id' was not found."
 }
 
@@ -346,7 +362,8 @@ function Undo-LastWindowChange {
 }
 
 function Show-WorkToolsRoutinePreview {
-    $routine = Get-ValidatedRoutine -Id 'open_work_tools'
+    param([Parameter(Mandatory)][string]$Id)
+    $routine = Get-ValidatedRoutine -Id $Id
     $labels = @{ open_notepad = 'Open Notepad'; open_explorer = 'Open File Explorer' }
     $steps = @($routine.steps)
     $previewText = "Run '$($routine.name)'?`r`n`r`n" + (($steps | ForEach-Object { $labels[$_.action] }) -join "`r`n")
@@ -377,6 +394,50 @@ function Show-WorkToolsRoutinePreview {
         $lastAction.Text = "Last action: $summary"
         [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), "$($routine.name) — result")
     }) | Out-Null
+}
+
+function Show-RoutineEditor {
+    $editor = [System.Windows.Forms.Form]::new()
+    $editor.Text = 'Create a local voice routine'
+    $editor.StartPosition = 'CenterParent'
+    $editor.Size = [System.Drawing.Size]::new(400, 330)
+    $panel = [System.Windows.Forms.FlowLayoutPanel]::new()
+    $panel.Dock = 'Fill'; $panel.FlowDirection = 'TopDown'; $panel.WrapContents = $false; $panel.Padding = [System.Windows.Forms.Padding]::new(12)
+    $nameLabel = [System.Windows.Forms.Label]::new(); $nameLabel.Text = 'Routine name'; $nameLabel.AutoSize = $true
+    $nameBox = [System.Windows.Forms.TextBox]::new(); $nameBox.Width = 340
+    $phraseLabel = [System.Windows.Forms.Label]::new(); $phraseLabel.Text = 'Spoken phrase'; $phraseLabel.AutoSize = $true
+    $phraseBox = [System.Windows.Forms.TextBox]::new(); $phraseBox.Width = 340
+    $actionLabel = [System.Windows.Forms.Label]::new(); $actionLabel.Text = 'Actions'; $actionLabel.AutoSize = $true
+    $actionList = [System.Windows.Forms.CheckedListBox]::new(); $actionList.Width = 340; $actionList.Height = 70
+    [void]$actionList.Items.Add('Open Notepad'); [void]$actionList.Items.Add('Open File Explorer')
+    $save = [System.Windows.Forms.Button]::new(); $save.Text = 'Save routine'; $save.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $cancel = [System.Windows.Forms.Button]::new(); $cancel.Text = 'Cancel'; $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    foreach ($control in @($nameLabel,$nameBox,$phraseLabel,$phraseBox,$actionLabel,$actionList,$save,$cancel)) { $panel.Controls.Add($control) }
+    $editor.Controls.Add($panel); $editor.AcceptButton = $save; $editor.CancelButton = $cancel
+    try {
+        if ($editor.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        $name = $nameBox.Text.Trim(); $phrase = $phraseBox.Text.Trim().ToLowerInvariant()
+        if (-not $name -or $name.Length -gt 80 -or -not $phrase -or $phrase.Length -gt 100 -or $actionList.CheckedItems.Count -eq 0) {
+            throw 'Enter a name, one spoken phrase, and at least one action.'
+        }
+        $catalog = @(Get-ValidatedRoutine)
+        if (@($catalog | Where-Object { @($_.phrases | ForEach-Object { $_.Trim().ToLowerInvariant() }) -contains $phrase }).Count -gt 0) {
+            throw 'That spoken phrase is already used.'
+        }
+        $actionIds = @{ 'Open Notepad' = 'open_notepad'; 'Open File Explorer' = 'open_explorer' }
+        $steps = @($actionList.CheckedItems | ForEach-Object { @{ action = $actionIds[[string]$_] } })
+        $routine = @{ version = 1; id = ('user_' + [guid]::NewGuid().ToString('N')); name = $name; phrases = @($phrase); steps = $steps }
+        $directory = Join-Path $env:LOCALAPPDATA 'VoiceDesk'
+        [void][System.IO.Directory]::CreateDirectory($directory)
+        $userFile = Join-Path $directory 'routines.json'
+        $existing = @(); if (Test-Path $userFile) { $existing = @(Get-Content $userFile -Raw | ConvertFrom-Json) }
+        $tempFile = "$userFile.$([guid]::NewGuid().ToString('N')).tmp"
+        [System.IO.File]::WriteAllText($tempFile, (ConvertTo-Json -InputObject @($existing + $routine) -Depth 6), [System.Text.UTF8Encoding]::new($false))
+        Move-Item -LiteralPath $tempFile -Destination $userFile -Force
+        $null = Get-ValidatedRoutine -Id $routine.id
+        $hint.Text = "Saved '$name'. Say '$phrase' to preview the routine."
+    } catch { $lastAction.Text = "Routine not saved: $($_.Exception.Message)" }
+    finally { $editor.Dispose() }
 }
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -477,6 +538,9 @@ $clearContextButton.AutoSize = $true
 $routineButton = [System.Windows.Forms.Button]::new()
 $routineButton.Text = 'Preview routine: Open work tools'
 $routineButton.AutoSize = $true
+$createRoutineButton = [System.Windows.Forms.Button]::new()
+$createRoutineButton.Text = 'Create local routine'
+$createRoutineButton.AutoSize = $true
 $undoButton = [System.Windows.Forms.Button]::new()
 $undoButton.Text = 'Undo last window change'
 $undoButton.AutoSize = $true
@@ -493,7 +557,7 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
-$layout.RowCount = 19
+$layout.RowCount = 20
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
@@ -508,6 +572,7 @@ $layout.Controls.Add($contextToggle, 0, 15)
 $layout.Controls.Add($clearContextButton, 0, 16)
 $layout.Controls.Add($routineButton, 0, 17)
 $layout.Controls.Add($undoButton, 0, 18)
+$layout.Controls.Add($createRoutineButton, 0, 19)
 $form.Controls.Add($layout)
 $state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; ContextEnabled = $false; Context = @(); TargetHandle = [IntPtr]::Zero; TargetTitle = $null; LastUndo = $null }
 
@@ -596,7 +661,8 @@ $clearContextButton.add_Click({
     $state.Context = @()
     $hint.Text = 'Cloud conversation context cleared.'
 })
-$routineButton.add_Click({ Show-WorkToolsRoutinePreview })
+$routineButton.add_Click({ Show-WorkToolsRoutinePreview -Id 'open_work_tools' })
+$createRoutineButton.add_Click({ Show-RoutineEditor })
 $undoButton.add_Click({ Undo-LastWindowChange })
 
 if (-not $recognizerInfo) {

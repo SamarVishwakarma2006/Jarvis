@@ -86,7 +86,9 @@ AI output is a proposed intent from a fixed schema. VoiceDesk validates the inte
 
 **Undo last window change** restores a UI Automation minimize/maximize to its prior state only if the same window is still there and unchanged. Keyboard shortcuts do not support undo.
 
-The routine format is defined by [`routine.schema.json`](routine.schema.json), and the built-in example is in [`routines.json`](routines.json). VoiceDesk validates the routine and every action ID before showing its preview. A routine editor and user-created routines are not implemented yet.
+The routine format is defined by [`routine.schema.json`](routine.schema.json), and the built-in example is in [`routines.json`](routines.json). VoiceDesk validates the routine and every action ID before showing its preview.
+
+Use **Create local routine** to save a routine with a name, one spoken phrase, and one or both currently supported actions: **Open Notepad** and **Open File Explorer**. User routines are stored in `%LOCALAPPDATA%\VoiceDesk\routines.json` and stay on this PC. Saying the saved phrase shows the same action preview and confirmation used by the built-in routine; actions only run after approval. The editor does not accept scripts, shell commands, or file paths.
 
 ## License
 
