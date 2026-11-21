@@ -19,6 +19,16 @@ Run this on each Windows version you plan to support. Record the Windows version
 - [ ] Connect or enable a microphone and press **Start listening** again; confirm recovery without restarting VoiceDesk.
 - [ ] Disconnect/disable the microphone during listening; confirm the error is visible and retry works after restoring it.
 
+## Local routines
+
+- [ ] With cloud AI off, create a routine with two spoken phrases and two actions; confirm its phrases/actions remain local after restarting VoiceDesk.
+- [ ] Try a phrase already used by another routine; confirm VoiceDesk rejects the duplicate.
+- [ ] Reorder the selected actions; preview the routine and confirm the displayed order matches the saved order.
+- [ ] Cancel a routine preview and confirm no action runs; repeat and approve it, then inspect the result receipt.
+- [ ] Edit a saved routine; confirm its ID and updated phrases/actions remain associated after reopening the editor.
+- [ ] Delete a user routine after confirmation; confirm its phrases no longer invoke it and the built-in routine remains available.
+- [ ] Cancel routine deletion and confirm the routine remains saved.
+
 ## Optional AI and context
 
 - [ ] Start without the AI service; enable cloud AI and confirm it reverts off with setup guidance.
