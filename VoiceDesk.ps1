@@ -440,6 +440,36 @@ function Show-RoutineEditor {
     finally { $editor.Dispose() }
 }
 
+function Show-RoutineManager {
+    $routines = @(Get-ValidatedRoutine | Where-Object id -like 'user_*')
+    if ($routines.Count -eq 0) { [void][System.Windows.Forms.MessageBox]::Show($form, 'No user-created routines are saved yet.', 'Manage routines'); return }
+    $manager = [System.Windows.Forms.Form]::new()
+    $manager.Text = 'Manage local routines'; $manager.StartPosition = 'CenterParent'; $manager.Size = [System.Drawing.Size]::new(420, 300)
+    $list = [System.Windows.Forms.ListBox]::new(); $list.Dock = 'Fill'; $list.DisplayMember = 'Display'
+    foreach ($routine in $routines) { [void]$list.Items.Add([pscustomobject]@{ Id = $routine.id; Display = "$($routine.name) — $($routine.phrases -join ', ')" }) }
+    $remove = [System.Windows.Forms.Button]::new(); $remove.Text = 'Delete selected'; $remove.AutoSize = $true
+    $close = [System.Windows.Forms.Button]::new(); $close.Text = 'Close'; $close.AutoSize = $true
+    $buttons = [System.Windows.Forms.FlowLayoutPanel]::new(); $buttons.Dock = 'Bottom'; $buttons.AutoSize = $true
+    $buttons.Controls.Add($remove); $buttons.Controls.Add($close); $manager.Controls.Add($list); $manager.Controls.Add($buttons)
+    $remove.add_Click({
+        if (-not $list.SelectedItem) { return }
+        $item = $list.SelectedItem
+        $answer = [System.Windows.Forms.MessageBox]::Show($manager, "Delete '$($item.Display)'?", 'Confirm routine deletion', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+        try {
+            $userFile = Join-Path $env:LOCALAPPDATA 'VoiceDesk\routines.json'
+            $remaining = @((Get-Content $userFile -Raw | ConvertFrom-Json) | Where-Object id -ne $item.Id)
+            $tempFile = "$userFile.$([guid]::NewGuid().ToString('N')).tmp"
+            [System.IO.File]::WriteAllText($tempFile, (ConvertTo-Json -InputObject $remaining -Depth 6), [System.Text.UTF8Encoding]::new($false))
+            Move-Item -LiteralPath $tempFile -Destination $userFile -Force
+            [void]$list.Items.Remove($item)
+            $lastAction.Text = "Last action: Deleted routine '$($item.Display.Split('—')[0].Trim())'."
+        } catch { $lastAction.Text = "Routine not deleted: $($_.Exception.Message)" }
+    })
+    $close.add_Click({ $manager.Close() })
+    try { [void]$manager.ShowDialog($form) } finally { $manager.Dispose() }
+}
+
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $culture = (Get-Culture).Name
 $recognizerInfo = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers() |
@@ -541,6 +571,9 @@ $routineButton.AutoSize = $true
 $createRoutineButton = [System.Windows.Forms.Button]::new()
 $createRoutineButton.Text = 'Create local routine'
 $createRoutineButton.AutoSize = $true
+$manageRoutineButton = [System.Windows.Forms.Button]::new()
+$manageRoutineButton.Text = 'Manage local routines'
+$manageRoutineButton.AutoSize = $true
 $undoButton = [System.Windows.Forms.Button]::new()
 $undoButton.Text = 'Undo last window change'
 $undoButton.AutoSize = $true
@@ -557,7 +590,7 @@ $layout.Controls.Add($commands, 0, 7)
 $layout.Controls.Add($cameraStatus, 0, 8)
 $layout.Controls.Add($gestureButton, 0, 9)
 $layout.Controls.Add($stopAllButton, 0, 10)
-$layout.RowCount = 20
+$layout.RowCount = 21
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
 [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new('AutoSize'))
@@ -573,6 +606,7 @@ $layout.Controls.Add($clearContextButton, 0, 16)
 $layout.Controls.Add($routineButton, 0, 17)
 $layout.Controls.Add($undoButton, 0, 18)
 $layout.Controls.Add($createRoutineButton, 0, 19)
+$layout.Controls.Add($manageRoutineButton, 0, 20)
 $form.Controls.Add($layout)
 $state = @{ Listening = $false; MicrophoneReady = $false; Busy = $false; RecognitionStopped = $false; ResumeAfterAction = $false; GesturePaused = $false; GestureProcess = $null; GesturesActive = $false; AiEnabled = $false; ContextEnabled = $false; Context = @(); TargetHandle = [IntPtr]::Zero; TargetTitle = $null; LastUndo = $null }
 
@@ -663,6 +697,7 @@ $clearContextButton.add_Click({
 })
 $routineButton.add_Click({ Show-WorkToolsRoutinePreview -Id 'open_work_tools' })
 $createRoutineButton.add_Click({ Show-RoutineEditor })
+$manageRoutineButton.add_Click({ Show-RoutineManager })
 $undoButton.add_Click({ Undo-LastWindowChange })
 
 if (-not $recognizerInfo) {
