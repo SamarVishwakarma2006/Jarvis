@@ -11,6 +11,8 @@ See [ROADMAP.md](ROADMAP.md) for the GitHub build plan and [WINDOWS-ACCEPTANCE.m
 - .NET Framework components included with Windows PowerShell (System.Speech and Windows Forms)
 - A microphone and an installed Windows speech recognizer for your current language
 
+If **Start listening** is disabled, VoiceDesk could not find a speech recognizer for your Windows language. Add the matching speech language in Windows Settings and restart VoiceDesk. The rest of the interface remains available while voice recognition is unavailable.
+
 ## Run
 
 For the source preview, extract the GitHub release ZIP and double-click `Run-VoiceDesk.cmd`. Or open PowerShell in this folder and run:

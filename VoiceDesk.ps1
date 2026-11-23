@@ -543,6 +543,7 @@ $status.Font = [System.Drawing.Font]::new('Segoe UI', 14, [System.Drawing.FontSt
 $hint = [System.Windows.Forms.Label]::new()
 $hint.Text = 'Press Start listening before speaking.'
 $hint.AutoSize = $true
+$hint.MaximumSize = [System.Drawing.Size]::new(400, 0)
 $transcript = [System.Windows.Forms.Label]::new()
 $transcript.Text = 'Heard: —'
 $transcript.Dock = 'Fill'
@@ -737,7 +738,7 @@ $manageRoutineButton.add_Click({ Show-RoutineManager })
 $undoButton.add_Click({ Undo-LastWindowChange })
 
 if (-not $recognizerInfo) {
-    $hint.Text = "No Windows speech recognizer is installed for '$culture'. Install the matching speech language in Windows Settings."
+    $hint.Text = "No Windows speech recognizer is installed for '$culture'. Add its Windows speech language, then restart VoiceDesk."
     $listenButton.Enabled = $false
 } else {
     try {
