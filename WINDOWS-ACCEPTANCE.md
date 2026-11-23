@@ -24,6 +24,7 @@ Run this on each Windows version you plan to support. Record the Windows version
 - [ ] With cloud AI off, create a routine with two spoken phrases and two actions; confirm its phrases/actions remain local after restarting VoiceDesk.
 - [ ] Try a phrase already used by another routine; confirm VoiceDesk rejects the duplicate.
 - [ ] Reorder the selected actions; preview the routine and confirm the displayed order matches the saved order.
+- [ ] With cloud AI off (and even if voice recognition is unavailable), select the routine in **Manage local routines** and use **Preview selected**; cancel once and confirm no action runs, then approve a harmless test routine and inspect its receipt.
 - [ ] Cancel a routine preview and confirm no action runs; repeat and approve it, then inspect the result receipt.
 - [ ] Edit a saved routine; confirm its ID and updated phrases/actions remain associated after reopening the editor.
 - [ ] Delete a user routine after confirmation; confirm its phrases no longer invoke it and the built-in routine remains available.

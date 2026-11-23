@@ -362,20 +362,20 @@ function Undo-LastWindowChange {
 }
 
 function Show-WorkToolsRoutinePreview {
-    param([Parameter(Mandatory)][string]$Id)
+    param([Parameter(Mandatory)][string]$Id, [System.Windows.Forms.Form]$Owner = $form)
     $routine = Get-ValidatedRoutine -Id $Id
     $labels = @{ open_notepad = 'Open Notepad'; open_explorer = 'Open File Explorer'; open_calculator = 'Open Calculator'; open_settings = 'Open Windows Settings' }
     $steps = @($routine.steps)
     $previewText = "Run '$($routine.name)'?`r`n`r`n" + (($steps | ForEach-Object { $labels[$_.action] }) -join "`r`n")
     $decision = @{ Approved = $false }
-    $form.Invoke([System.Action] {
+    $Owner.Invoke([System.Action] {
         $decision.Approved = ([System.Windows.Forms.MessageBox]::Show(
-            $form, $previewText, "Preview routine: $($routine.name)", [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+            $Owner, $previewText, "Preview routine: $($routine.name)", [System.Windows.Forms.MessageBoxButtons]::OKCancel,
             [System.Windows.Forms.MessageBoxIcon]::Information
         ) -eq [System.Windows.Forms.DialogResult]::OK)
     }) | Out-Null
     if (-not $decision.Approved) {
-        $form.Invoke([System.Action] { $lastAction.Text = 'Last action: Routine cancelled. Nothing was run.' }) | Out-Null
+        $Owner.Invoke([System.Action] { $lastAction.Text = 'Last action: Routine cancelled. Nothing was run.' }) | Out-Null
         return
     }
     $receipt = [System.Collections.Generic.List[string]]::new()
@@ -390,9 +390,9 @@ function Show-WorkToolsRoutinePreview {
     }
     if ($receipt.Count -lt $steps.Count) { $receipt.Add('Remaining steps were skipped.') }
     $summary = "$($routine.name) — $($receipt.Count) result lines."
-    $form.Invoke([System.Action] {
+    $Owner.Invoke([System.Action] {
         $lastAction.Text = "Last action: $summary"
-        [void][System.Windows.Forms.MessageBox]::Show($form, ($receipt -join "`r`n"), "$($routine.name) — result")
+        [void][System.Windows.Forms.MessageBox]::Show($Owner, ($receipt -join "`r`n"), "$($routine.name) — result")
     }) | Out-Null
 }
 
@@ -472,11 +472,13 @@ function Show-RoutineManager {
     $manager.Text = 'Manage local routines'; $manager.StartPosition = 'CenterParent'; $manager.Size = [System.Drawing.Size]::new(420, 300)
     $list = [System.Windows.Forms.ListBox]::new(); $list.Dock = 'Fill'; $list.DisplayMember = 'Display'
     foreach ($routine in $routines) { [void]$list.Items.Add([pscustomobject]@{ Id = $routine.id; Display = "$($routine.name) — $($routine.phrases -join ', ')" }) }
+    $preview = [System.Windows.Forms.Button]::new(); $preview.Text = 'Preview selected'; $preview.AutoSize = $true
     $edit = [System.Windows.Forms.Button]::new(); $edit.Text = 'Edit selected'; $edit.AutoSize = $true
     $remove = [System.Windows.Forms.Button]::new(); $remove.Text = 'Delete selected'; $remove.AutoSize = $true
     $close = [System.Windows.Forms.Button]::new(); $close.Text = 'Close'; $close.AutoSize = $true
     $buttons = [System.Windows.Forms.FlowLayoutPanel]::new(); $buttons.Dock = 'Bottom'; $buttons.AutoSize = $true
-    $buttons.Controls.Add($edit); $buttons.Controls.Add($remove); $buttons.Controls.Add($close); $manager.Controls.Add($list); $manager.Controls.Add($buttons)
+    $buttons.Controls.Add($preview); $buttons.Controls.Add($edit); $buttons.Controls.Add($remove); $buttons.Controls.Add($close); $manager.Controls.Add($list); $manager.Controls.Add($buttons)
+    $preview.add_Click({ if ($list.SelectedItem) { Show-WorkToolsRoutinePreview -Id $list.SelectedItem.Id -Owner $manager } })
     $edit.add_Click({
         if (-not $list.SelectedItem) { return }
         $item = $list.SelectedItem
