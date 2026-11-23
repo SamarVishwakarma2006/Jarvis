@@ -13,6 +13,12 @@ Run this on each Windows version you plan to support. Record the Windows version
 - [ ] Select **Foreground window (default)** and verify the default target behavior is restored.
 - [ ] Close VoiceDesk while listening; confirm microphone capture stops.
 
+## UI layout and routine access
+
+- [ ] On the default-size window, confirm long help and option labels wrap without requiring horizontal scrolling.
+- [ ] Confirm the built-in preview, **Create local routine**, and **Manage local routines** controls are reachable near the command hints, including when voice recognition is unavailable.
+- [ ] Maximize and restore the window; confirm the scrollable layout still exposes every control.
+
 ## Microphone recovery
 
 - [ ] Start without a usable microphone; confirm a clear error and that **Start listening** remains available.
