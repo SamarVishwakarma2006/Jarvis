@@ -55,16 +55,7 @@ For screen questions, VoiceDesk first reads accessible text from the active wind
 
 ## Optional camera gestures
 
-If you have not created the virtual environment yet, install Python 3.10–3.12 and run:
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-gestures.txt
-```
-
-If you already followed the setup above, no additional install command is needed.
-
-In VoiceDesk, leave the individual gesture options enabled as desired, then press **Start camera gestures**. A separate live preview appears and shows when camera processing is active. Hold a fist for about one second to pause voice listening; hold an open palm for about one second to resume it. Closing the preview with `Q` or pressing **Stop camera gestures** stops capture. Hand tracking runs locally; frames are not saved or sent over the network. Only these two gestures are recognized, and gestures cannot close windows or launch apps.
+After completing the setup above, leave the desired gesture options enabled and press **Start camera gestures**. A separate live preview appears while camera processing is active. Hold a fist for about one second to pause voice listening; hold an open palm for about one second to resume it. Closing the preview with `Q` or pressing **Stop camera gestures** stops capture. Hand tracking runs locally; frames are not saved or sent over the network. Only these two gestures are recognized, and gestures cannot close windows or launch apps.
 
 Camera gesture support is optional. If Python, the camera, or the packages are unavailable, voice commands continue to work and VoiceDesk reports the camera error.
 
