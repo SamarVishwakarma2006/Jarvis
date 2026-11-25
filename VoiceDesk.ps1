@@ -128,7 +128,7 @@ function Resolve-VoiceIntent {
     if ($localIntents.ContainsKey($normalized)) {
         $localIntent = $localIntents[$normalized]
         if ($localIntent -eq 'screen_question' -and -not $state.AiEnabled) {
-            return @{ intent = 'unknown'; reply = 'Cloud AI is off. Enable it in VoiceDesk to ask questions about the screen.'; question = $Text }
+            return @{ intent = 'unknown'; reply = 'Local AI is off. Enable it in VoiceDesk to ask questions about the screen.'; question = $Text }
         }
         return @{ intent = $localIntent; reply = 'Matched a local voice command.'; requires_confirmation = ($normalized -eq 'close window'); question = $Text }
     }
@@ -140,7 +140,7 @@ function Resolve-VoiceIntent {
     }
 
     if (-not $state.AiEnabled) {
-        return @{ intent = 'unknown'; reply = 'Cloud AI is off. Enable it in VoiceDesk for natural-language commands.'; question = $Text }
+        return @{ intent = 'unknown'; reply = 'Local AI is off. Enable it in VoiceDesk for natural-language commands.'; question = $Text }
     }
 
     $payloadObject = @{ text = $Text }
@@ -216,11 +216,11 @@ function Get-ScreenAnswer {
         $footer.Dock = 'Bottom'
         $footer.Height = 76
         $notice = [System.Windows.Forms.Label]::new()
-        $notice.Text = 'This screenshot may contain private information. It will be sent to OpenAI only if you choose Send.'
+        $notice.Text = 'This screenshot may contain private information. It will be sent to the local Qwen model only if you choose Send.'
         $notice.Dock = 'Top'
         $notice.AutoSize = $true
         $send = [System.Windows.Forms.Button]::new()
-        $send.Text = 'Send to OpenAI'
+        $send.Text = 'Send to local AI'
         $send.Width = 145
         $send.Height = 36
         $send.Location = [System.Drawing.Point]::new(670, 28)
@@ -553,7 +553,7 @@ $transcript.BorderStyle = 'FixedSingle'
 $transcript.Padding = [System.Windows.Forms.Padding]::new(12)
 $transcript.AutoEllipsis = $true
 $aiToggle = [System.Windows.Forms.CheckBox]::new()
-$aiToggle.Text = 'Enable cloud AI for natural-language and screen questions'
+$aiToggle.Text = 'Enable local AI for natural-language and screen questions'
 $aiToggle.AutoSize = $true
 $aiToggle.MaximumSize = [System.Drawing.Size]::new(400, 0)
 $aiToggle.Checked = $false
@@ -571,7 +571,7 @@ $listenButton.Text = 'Start listening'
 $listenButton.AutoSize = $true
 $listenButton.MinimumSize = [System.Drawing.Size]::new(180, 42)
 $commands = [System.Windows.Forms.Label]::new()
-$commands.Text = 'With cloud AI off, speech stays on this PC and only exact basic commands run. Enabling AI can send recognized text and requested screen content to OpenAI; API charges may apply.'
+$commands.Text = 'Qwen runs on this PC through Ollama. Enabling AI sends recognized text and any screenshot you approve to the local model; no cloud API is used.'
 $commands.AutoSize = $true
 $commands.MaximumSize = [System.Drawing.Size]::new(400, 0)
 $cameraStatus = [System.Windows.Forms.Label]::new()
@@ -603,7 +603,7 @@ $resumeGestureToggle.AutoSize = $true
 $resumeGestureToggle.MaximumSize = [System.Drawing.Size]::new(400, 0)
 $resumeGestureToggle.Checked = $true
 $contextToggle = [System.Windows.Forms.CheckBox]::new()
-$contextToggle.Text = 'Keep up to three cloud voice turns for follow-up requests (session only)'
+$contextToggle.Text = 'Keep up to three local AI voice turns for follow-up requests (session only)'
 $contextToggle.AutoSize = $true
 $contextToggle.MaximumSize = [System.Drawing.Size]::new(400, 0)
 $contextToggle.Checked = $false
@@ -773,7 +773,7 @@ if (-not $recognizerInfo) {
             $state.Listening = $true
             $state.RecognitionStopped = $false
             $status.Text = 'Listening…'
-            $hint.Text = if ($state.AiEnabled) { 'Listening. Cloud AI is enabled for non-exact requests and screen questions.' } else { 'Listening locally. Cloud AI is off; only exact basic commands will run.' }
+            $hint.Text = if ($state.AiEnabled) { 'Listening. Local AI is enabled for non-exact requests and screen questions.' } else { 'Listening locally. AI is off; only exact basic commands will run.' }
             $listenButton.Text = 'Stop listening'
             $recognizer.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
         }
@@ -802,11 +802,11 @@ if (-not $recognizerInfo) {
             if ($state.AiEnabled) {
                 try {
                     Invoke-RestMethod -Uri 'http://127.0.0.1:43127/health' -Method Get -TimeoutSec 2 | Out-Null
-                    $hint.Text = 'Cloud AI is ready. Non-exact requests and screen questions may be sent to OpenAI.'
+                    $hint.Text = 'Local Qwen AI is ready. Requests and approved screen content stay on this PC.'
                 } catch {
                     $state.AiEnabled = $false
                     $aiToggle.Checked = $false
-                    $hint.Text = 'AI service is not running. Start it using the Optional AI intent service steps in README.md.'
+                    $hint.Text = 'Local AI is unavailable. Start Ollama, install qwen3.5:4b, then run Start-AI-Service.cmd.'
                 }
             }
         })

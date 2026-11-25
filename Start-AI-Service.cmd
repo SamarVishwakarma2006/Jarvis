@@ -12,13 +12,12 @@ if %NODE_MAJOR% LSS 18 (
     pause
     exit /b 1
 )
-if not defined OPENAI_API_KEY (
-    echo OPENAI_API_KEY is missing. Set it in your Windows user environment variables.
-    pause
-    exit /b 1
-)
 if not defined VOICEDESK_MODEL (
-    echo VOICEDESK_MODEL is missing. Set it to a model available to your API account.
+    set "VOICEDESK_MODEL=qwen3.5:4b"
+)
+where ollama >nul 2>nul
+if errorlevel 1 (
+    echo Ollama was not found. Install Ollama, then run: ollama pull %VOICEDESK_MODEL%
     pause
     exit /b 1
 )
